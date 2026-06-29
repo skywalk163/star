@@ -716,6 +716,278 @@
       document.getElementById('config-form').addEventListener('change', checkUnsaved);
 
       loadConfig();
+
+      // 模板管理
+      let editingTemplateId = null;
+
+      function loadTemplateList() {
+          const container = document.getElementById('templateList');
+          if (!container) return;
+          
+          const templates = templateService.getAll();
+          container.innerHTML = templates.map(t => `
+              <div style="
+                  display: flex;
+                  align-items: center;
+                  padding: 10px 12px;
+                  background: var(--color-bg-elevated);
+                  border-radius: 8px;
+                  gap: 12px;
+              ">
+                  <span style="font-size: 13px; flex: 1;">${escapeHtml(t.name)}</span>
+                  <span style="font-size: 11px; color: var(--color-text-muted); flex: 2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(t.content)}">
+                      ${escapeHtml(t.content.substring(0, 40))}...
+                  </span>
+                  <div style="display: flex; gap: 4px;">
+                      <button onclick="editTemplate('${t.id}')" style="
+                          padding: 4px 8px;
+                          background: transparent;
+                          border: 1px solid var(--color-border);
+                          border-radius: 4px;
+                          color: var(--color-text-secondary);
+                          font-size: 11px;
+                          cursor: pointer;
+                      ">编辑</button>
+                      <button onclick="deleteTemplate('${t.id}')" style="
+                          padding: 4px 8px;
+                          background: transparent;
+                          border: 1px solid var(--color-danger);
+                          border-radius: 4px;
+                          color: var(--color-danger);
+                          font-size: 11px;
+                          cursor: pointer;
+                      ">删除</button>
+                  </div>
+              </div>
+          `).join('');
+      }
+
+      function showAddTemplateModal() {
+          editingTemplateId = null;
+          document.getElementById('modalTitle').textContent = '添加模板';
+          document.getElementById('templateName').value = '';
+          document.getElementById('templateContent').value = '';
+          document.getElementById('templateModal').style.display = 'flex';
+      }
+
+      function editTemplate(id) {
+          const template = templateService.getById(id);
+          if (!template) return;
+          
+          editingTemplateId = id;
+          document.getElementById('modalTitle').textContent = '编辑模板';
+          document.getElementById('templateName').value = template.name;
+          document.getElementById('templateContent').value = template.content;
+          document.getElementById('templateModal').style.display = 'flex';
+      }
+
+      function closeTemplateModal() {
+          document.getElementById('templateModal').style.display = 'none';
+          editingTemplateId = null;
+      }
+
+      function saveTemplate() {
+          const name = document.getElementById('templateName').value.trim();
+          const content = document.getElementById('templateContent').value.trim();
+          
+          if (!name || !content) {
+              alert('请填写名称和内容');
+              return;
+          }
+          
+          if (editingTemplateId) {
+              templateService.update(editingTemplateId, { name, content });
+          } else {
+              templateService.add({ name, content, variables: [] });
+          }
+          
+          closeTemplateModal();
+          loadTemplateList();
+      }
+
+      function deleteTemplate(id) {
+          if (!confirm('确定要删除这个模板吗？')) return;
+          templateService.delete(id);
+          loadTemplateList();
+      }
+
+      function exportTemplates() {
+          const json = templateService.export();
+          const blob = new Blob([json], { type: 'application/json' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = 'star-templates.json';
+          a.click();
+          URL.revokeObjectURL(url);
+      }
+
+      function importTemplates(event) {
+          const file = event.target.files[0];
+          if (!file) return;
+          
+          const reader = new FileReader();
+          reader.onload = function(e) {
+              const result = templateService.import(e.target.result);
+              if (result.success) {
+                  alert(`成功导入 ${result.count} 个模板`);
+                  loadTemplateList();
+              } else {
+                  alert('导入失败: ' + result.error);
+              }
+          };
+          reader.readAsText(file);
+          event.target.value = '';
+      }
+
+      function resetTemplates() {
+          if (!confirm('确定要重置为默认模板吗？这将删除所有自定义模板。')) return;
+          templateService.reset();
+          loadTemplateList();
+      }
+
+      function escapeHtml(text) {
+          const div = document.createElement('div');
+          div.textContent = text;
+          return div.innerHTML;
+      }
+
+      // 页面加载时初始化
+      document.addEventListener('DOMContentLoaded', function() {
+          loadTemplateList();
+      });
     </script>
+
+<!-- 快捷指令模板管理 -->
+<div class="settings-section" style="margin-top: 32px;">
+    <h3 style="font-size: 15px; font-weight: 600; margin-bottom: 16px; display: flex; align-items: center; gap: 8px;">
+        <span>📋</span> 快捷指令模板
+    </h3>
+    
+    <div style="background: var(--color-bg-card); border-radius: 12px; padding: 16px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+            <span style="font-size: 13px; color: var(--color-text-secondary);">
+                自定义快捷指令，一键发送
+            </span>
+            <button class="btn btn-sm" onclick="showAddTemplateModal()" style="
+                background: var(--color-primary);
+                color: #1a1f3a;
+                border: none;
+                padding: 6px 12px;
+                border-radius: 6px;
+                font-size: 12px;
+                cursor: pointer;
+            ">+ 添加模板</button>
+        </div>
+        
+        <div id="templateList" style="display: flex; flex-direction: column; gap: 8px;">
+        </div>
+        
+        <div style="display: flex; gap: 12px; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--color-border);">
+            <button class="btn btn-sm" onclick="exportTemplates()" style="
+                background: var(--color-bg-elevated);
+                color: var(--color-text-primary);
+                border: 1px solid var(--color-border);
+                padding: 6px 12px;
+                border-radius: 6px;
+                font-size: 12px;
+                cursor: pointer;
+            ">导出模板</button>
+            <label class="btn btn-sm" style="
+                background: var(--color-bg-elevated);
+                color: var(--color-text-primary);
+                border: 1px solid var(--color-border);
+                padding: 6px 12px;
+                border-radius: 6px;
+                font-size: 12px;
+                cursor: pointer;
+            ">
+                导入模板
+                <input type="file" accept=".json" onchange="importTemplates(event)" style="display: none;">
+            </label>
+            <button class="btn btn-sm" onclick="resetTemplates()" style="
+                background: transparent;
+                color: var(--color-danger);
+                border: 1px solid var(--color-danger);
+                padding: 6px 12px;
+                border-radius: 6px;
+                font-size: 12px;
+                cursor: pointer;
+                margin-left: auto;
+            ">重置为默认</button>
+        </div>
+    </div>
+</div>
+
+<!-- 模板模态框 -->
+<div id="templateModal" style="
+    display: none;
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.6);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+">
+    <div style="
+        background: var(--color-bg-panel);
+        border-radius: 12px;
+        padding: 24px;
+        width: 480px;
+        max-width: 90%;
+    ">
+        <h3 id="modalTitle" style="font-size: 16px; font-weight: 600; margin-bottom: 16px;">添加模板</h3>
+        
+        <div style="margin-bottom: 12px;">
+            <label style="display: block; font-size: 12px; color: var(--color-text-muted); margin-bottom: 4px;">模板名称</label>
+            <input type="text" id="templateName" style="
+                width: 100%;
+                padding: 8px 12px;
+                background: var(--color-bg-elevated);
+                border: 1px solid var(--color-border);
+                border-radius: 6px;
+                color: var(--color-text-primary);
+                font-size: 13px;
+            ">
+        </div>
+        
+        <div style="margin-bottom: 16px;">
+            <label style="display: block; font-size: 12px; color: var(--color-text-muted); margin-bottom: 4px;">
+                指令内容 <span style="color: var(--color-text-muted); font-size: 11px;">（支持 {selection}、{file}、{project} 变量）</span>
+            </label>
+            <textarea id="templateContent" rows="5" style="
+                width: 100%;
+                padding: 8px 12px;
+                background: var(--color-bg-elevated);
+                border: 1px solid var(--color-border);
+                border-radius: 6px;
+                color: var(--color-text-primary);
+                font-size: 13px;
+                font-family: var(--font-mono);
+                resize: vertical;
+            "></textarea>
+        </div>
+        
+        <div style="display: flex; gap: 12px; justify-content: flex-end;">
+            <button onclick="closeTemplateModal()" style="
+                padding: 8px 16px;
+                background: var(--color-bg-elevated);
+                border: 1px solid var(--color-border);
+                border-radius: 6px;
+                color: var(--color-text-primary);
+                cursor: pointer;
+            ">取消</button>
+            <button onclick="saveTemplate()" style="
+                padding: 8px 16px;
+                background: var(--color-primary);
+                border: none;
+                border-radius: 6px;
+                color: #1a1f3a;
+                font-weight: 500;
+                cursor: pointer;
+            ">保存</button>
+        </div>
+    </div>
+</div>
 </body>
 </html>
