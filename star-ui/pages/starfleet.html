@@ -375,6 +375,46 @@
         </div>
     </div>
 
+    <div class="toolbar" style="
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 12px 24px;
+    background: var(--color-bg-panel);
+    border-bottom: 1px solid var(--color-border);
+">
+    <div class="selection-controls">
+        <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+            <input type="checkbox" id="selectAll" onchange="toggleSelectAll()">
+            <span style="font-size: 13px;">全选</span>
+        </label>
+        <span id="selectedCount" style="font-size: 12px; color: var(--color-text-muted); margin-left: 8px;">
+            已选 0 个
+        </span>
+    </div>
+    <div style="flex: 1;"></div>
+    <button id="broadcastBtn" class="btn btn-primary btn-sm" onclick="openBroadcast()" disabled>
+        <i data-icon="radio" style="width:14px;height:14px;"></i>
+        批量发送指令
+    </button>
+    <div class="notification-status" id="notifStatus" style="
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 12px;
+        color: var(--color-text-muted);
+    ">
+        <span class="status-dot" style="
+            width: 8px; height: 8px; border-radius: 50%;
+            background: var(--color-text-muted);
+        "></span>
+        <span>通知已关闭</span>
+        <button onclick="requestNotification()" class="btn btn-sm" style="margin-left: 4px;">
+            开启
+        </button>
+    </div>
+</div>
+
     <div class="main-content">
         <!-- Summary Cards -->
         <div class="summary-cards" id="summaryCards">
@@ -433,6 +473,10 @@
     </div>
 
     <script>
+        // State
+        let selectedStars = new Set();
+        let notificationService = null;
+
         // Initialize Lucide icons
         if (typeof lucide !== 'undefined') {
             lucide.createIcons();
@@ -450,6 +494,12 @@
 
                 if (data.success) {
                     lastData = data;
+
+                    // 检查状态变化并发送通知
+                    if (notificationService) {
+                        notificationService.checkAndNotify(data);
+                    }
+
                     renderStarsStatus(data);
                 }
             } catch (err) {
@@ -506,9 +556,15 @@
                 const mainWindow = star.windows && star.windows[0];
                 const taskPreview = mainWindow && mainWindow.current_task;
 
+                const isSelected = selectedStars.has(`${star.star_type}_${star.pid}`);
+
                 return `
                 <div class="star-card ${statusClass}">
                     <div class="star-card-header">
+                        <input type="checkbox" 
+                            ${isSelected ? 'checked' : ''} 
+                            onchange="toggleStarSelection('${star.star_type}_${star.pid}')"
+                            style="margin-right: 8px; cursor: pointer;">
                         <div class="star-status-dot ${statusClass}"></div>
                         <div class="star-title">
                             <div class="star-name">${star.description || star.star_type}</div>
@@ -599,6 +655,94 @@
         // Initial load
         fetchStarsStatus();
         startAutoRefresh();
+
+        function toggleStarSelection(starId) {
+            if (selectedStars.has(starId)) {
+                selectedStars.delete(starId);
+            } else {
+                selectedStars.add(starId);
+            }
+            updateSelectionUI();
+        }
+
+        function toggleSelectAll() {
+            const selectAll = document.getElementById('selectAll');
+            if (selectAll.checked) {
+                lastData?.stars?.forEach(s => {
+                    selectedStars.add(`${s.star_type}_${s.pid}`);
+                });
+            } else {
+                selectedStars.clear();
+            }
+            updateSelectionUI();
+            renderStarsStatus(lastData);
+        }
+
+        function updateSelectionUI() {
+            const count = selectedStars.size;
+            document.getElementById('selectedCount').textContent = `已选 ${count} 个`;
+            document.getElementById('broadcastBtn').disabled = count === 0;
+
+            const selectAll = document.getElementById('selectAll');
+            if (lastData?.stars) {
+                selectAll.checked = selectedStars.size === lastData.stars.length;
+                selectAll.indeterminate = selectedStars.size > 0 && selectedStars.size < lastData.stars.length;
+            }
+        }
+
+        function openBroadcast() {
+            if (selectedStars.size === 0) return;
+
+            const hwids = [];
+            lastData?.stars?.forEach(s => {
+                const starId = `${s.star_type}_${s.pid}`;
+                if (selectedStars.has(starId)) {
+                    hwids.push(s.windows?.[0]?.hwnd);
+                }
+            });
+
+            window.open(`/ui/pages/broadcast.html?hwids=${hwids.join(',')}`, '_blank', 'width=800,height=600');
+        }
+
+        async function requestNotification() {
+            try {
+                notificationService = new NotificationService();
+                await notificationService.requestPermission();
+                updateNotifStatus(notificationService.enabled);
+            } catch (err) {
+                console.error('Failed to init notification:', err);
+            }
+        }
+
+        function updateNotifStatus(enabled) {
+            const statusEl = document.getElementById('notifStatus');
+            const dot = statusEl.querySelector('.status-dot');
+            const text = statusEl.querySelector('span:last-child');
+            const btn = statusEl.querySelector('button');
+
+            if (enabled) {
+                dot.className = 'status-dot allowed';
+                text.textContent = '通知已开启';
+                btn.style.display = 'none';
+            } else {
+                dot.className = 'status-dot denied';
+                text.textContent = '通知未开启';
+                btn.textContent = '重试';
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            try {
+                if (typeof NotificationService !== 'undefined') {
+                    notificationService = new NotificationService();
+                    if (notificationService.enabled) {
+                        updateNotifStatus(true);
+                    }
+                }
+            } catch (err) {
+                console.warn('Notification service not available');
+            }
+        });
     </script>
 </body>
 </html>
