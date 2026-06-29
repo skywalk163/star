@@ -1,0 +1,828 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>星轨控制台 — 群星 Star</title>
+    <style id="theme-vars">
+/* ============================================
+   群星 Star — Brand Design Tokens
+   Deep Space Theme
+   ============================================ */
+
+:root {
+  /* === Primary Palette === */
+  --color-bg-deep: #0a0e27;
+  --color-bg-panel: #1a1f3a;
+  --color-bg-card: #151934;
+  --color-bg-elevated: #212647;
+  --color-bg-hover: #2a3058;
+
+  /* === Accent: Starlight Gold === */
+  --color-primary: #ffd700;
+  --color-primary-dim: rgba(255, 215, 0, 0.15);
+  --color-primary-muted: rgba(255, 215, 0, 0.6);
+  --color-primary-glow: rgba(255, 215, 0, 0.25);
+
+  /* === Star Magnitude Colors === */
+  --color-star-supernova: #ffffff;
+  --color-star-bright: #4fc3f7;
+  --color-star-normal: #b0bec5;
+  --color-star-dim: #616161;
+
+  /* === Star Status Colors === */
+  --color-status-shining: #66bb6a;
+  --color-status-awaiting: #ffa726;
+  --color-status-faded: #ef5350;
+  --color-status-nascent: #ab47bc;
+  --color-status-orbiting: #42a5f5;
+  --color-status-constellated: #ffd700;
+  --color-status-darkened: #455a64;
+
+  /* === Semantic State === */
+  --state-success: #66bb6a;
+  --state-warning: #ffa726;
+  --state-error: #ef5350;
+  --state-info: #42a5f5;
+
+  /* === Text === */
+  --color-text-primary: #e8eaf6;
+  --color-text-secondary: #9fa8da;
+  --color-text-muted: #616885;
+  --color-text-gold: #ffd700;
+
+  /* === Border === */
+  --color-border: rgba(255, 255, 255, 0.08);
+  --color-border-subtle: rgba(255, 255, 255, 0.04);
+  --color-border-glow: rgba(255, 215, 0, 0.2);
+
+  /* === Surface Depth === */
+  --surface-1: #0a0e27;
+  --surface-2: #1a1f3a;
+  --surface-3: #212647;
+  --surface-4: #2a3058;
+
+  /* === Typography === */
+  --font-display: 'Inter', 'Noto Sans SC', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+  --font-body: var(--font-display);
+
+  /* === Font Sizes === */
+  --text-xs: 0.75rem;
+  --text-sm: 0.8125rem;
+  --text-base: 0.875rem;
+  --text-lg: 1rem;
+  --text-xl: 1.125rem;
+  --text-2xl: 1.5rem;
+  --text-3xl: 1.875rem;
+  --text-4xl: 2.25rem;
+
+  /* === Radius === */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-full: 9999px;
+
+  /* === Spacing === */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 12px;
+  --space-lg: 16px;
+  --space-xl: 24px;
+  --space-2xl: 32px;
+  --space-3xl: 48px;
+
+  /* === Shadows (static surfaces: border-first, alpha <= 0.05) === */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.05);
+  /* Floating layers only (modal, drawer, tooltip) */
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.15);
+  --shadow-glow: 0 0 20px rgba(255, 215, 0, 0.15);
+
+  /* === Transitions === */
+  --transition-fast: 150ms ease;
+  --transition-normal: 250ms ease;
+  --transition-slow: 400ms ease;
+}
+
+/* === Typography Classes === */
+.font-display { font-family: var(--font-display); }
+.font-mono { font-family: var(--font-mono); }
+.font-body { font-family: var(--font-body); }
+
+.text-xs { font-size: var(--text-xs); }
+.text-sm { font-size: var(--text-sm); }
+.text-base { font-size: var(--text-base); }
+.text-lg { font-size: var(--text-lg); }
+.text-xl { font-size: var(--text-xl); }
+.text-2xl { font-size: var(--text-2xl); }
+.text-3xl { font-size: var(--text-3xl); }
+.text-4xl { font-size: var(--text-4xl); }
+
+/* === Color Utility Classes === */
+.text-primary { color: var(--color-text-primary); }
+.text-secondary { color: var(--color-text-secondary); }
+.text-muted { color: var(--color-text-muted); }
+.text-gold { color: var(--color-text-gold); }
+
+.bg-deep { background-color: var(--color-bg-deep); }
+.bg-panel { background-color: var(--color-bg-panel); }
+.bg-card { background-color: var(--color-bg-card); }
+.bg-elevated { background-color: var(--color-bg-elevated); }
+.bg-hover { background-color: var(--color-bg-hover); }
+
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.3.1/dist/index.global.js"></script>
+    <script src="https://unpkg.com/lucide@1.8.0/dist/umd/lucide.min.js"></script>
+    <style type="text/tailwindcss">
+  @theme inline {
+    --color-primary: var(--color-primary);
+    --color-border: var(--color-border);
+  }
+  @layer base {
+    body { background: var(--color-bg-deep); color: var(--color-text-primary); }
+    td, th { @apply break-words; word-break: break-all; word-break: auto-phrase; }
+    th { @apply whitespace-nowrap; }
+  }
+    </style>
+    <style>
+      .no-scrollbar::-webkit-scrollbar { display: none; }
+      .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      [data-icon] {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        -webkit-mask-size: contain;
+        mask-size: contain;
+        -webkit-mask-repeat: no-repeat;
+        mask-repeat: no-repeat;
+        -webkit-mask-position: center;
+        mask-position: center;
+        background-color: currentColor;
+      }
+    </style>
+    <script src="/ui/js/api-bridge.js"></script>
+</head>
+<body class="min-h-screen font-sans antialiased">
+    <main class="flex min-h-screen" style="background:var(--color-bg-deep);">
+      <!-- ==================== SIDEBAR ==================== -->
+      <nav class="hidden md:flex flex-col items-center w-[60px] shrink-0 py-4 border-r" style="background:var(--color-bg-panel);border-color:var(--color-border);">
+        <!-- Logo -->
+        <div class="flex items-center justify-center w-10 h-10 rounded-lg mb-6" style="background:var(--color-primary-dim);">
+          <span class="text-xl font-bold" style="color:var(--color-primary);">&#9733;</span>
+        </div>
+
+        <!-- Nav items -->
+        <div class="flex flex-col items-center gap-2 flex-1">
+          <a href="/ui/pages/starmap.html" data-dom-id="nav-starmap" title="Star Map" class="group relative flex items-center justify-center w-10 h-10 rounded-lg transition-all duration-200" style="color:var(--color-text-muted);" onmouseover="this.style.background='var(--color-bg-hover)';this.style.color='var(--color-text-secondary)'" onmouseout="this.style.background='transparent';this.style.color='var(--color-text-muted)'">
+            <i data-lucide="globe" class="w-5 h-5"></i>
+          </a>
+          <a href="#" data-dom-id="nav-orbit" title="Orbit Console" class="group relative flex items-center justify-center w-10 h-10 rounded-lg transition-all duration-200" style="background:var(--color-primary-dim);color:var(--color-primary);border-left:3px solid var(--color-primary);">
+            <i data-lucide="orbit" class="w-5 h-5"></i>
+          </a>
+          <a href="/ui/pages/starlight.html" data-dom-id="nav-starlight" title="Starlight Review" class="group relative flex items-center justify-center w-10 h-10 rounded-lg transition-all duration-200" style="color:var(--color-text-muted);" onmouseover="this.style.background='var(--color-bg-hover)';this.style.color='var(--color-text-secondary)'" onmouseout="this.style.background='transparent';this.style.color='var(--color-text-muted)'">
+            <i data-lucide="sparkles" class="w-5 h-5"></i>
+          </a>
+        </div>
+
+        <!-- Bottom settings -->
+        <a href="#" title="Settings" class="flex items-center justify-center w-10 h-10 rounded-lg transition-all duration-200" style="color:var(--color-text-muted);" onmouseover="this.style.background='var(--color-bg-hover)';this.style.color='var(--color-text-secondary)'" onmouseout="this.style.background='transparent';this.style.color='var(--color-text-muted)'">
+          <i data-lucide="settings" class="w-5 h-5"></i>
+        </a>
+      </nav>
+
+      <!-- ==================== MAIN CONTENT AREA ==================== -->
+      <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
+        <!-- ====== TOP HEADER BAR ====== -->
+        <header class="flex items-center justify-between px-4 md:px-6 h-14 shrink-0 border-b" style="background:var(--color-bg-panel);border-color:var(--color-border);">
+          <div class="flex items-center gap-3 min-w-0">
+            <h1 class="text-base font-semibold truncate" style="color:var(--color-text-primary);">星轨控制台 / Orbit Console</h1>
+            <span class="hidden sm:inline-block text-xs px-2 py-0.5 rounded whitespace-nowrap" style="background:var(--color-bg-elevated);color:var(--color-text-muted);">群星 Star &gt; 星轨</span>
+          </div>
+          <div class="flex items-center gap-4 shrink-0">
+            <div class="flex items-center gap-1.5 text-xs whitespace-nowrap" style="color:var(--color-text-secondary);">
+              <span class="inline-block w-2 h-2 rounded-full animate-pulse" style="background:var(--color-status-orbiting);"></span>
+              <span id="header-queue-count">队列: <span class="font-semibold" style="color:var(--color-primary);">-- 待发射</span></span>
+            </div>
+          </div>
+        </header>
+
+        <!-- ====== CONTENT ====== -->
+        <div class="flex-1 overflow-y-auto p-4 md:p-6">
+          
+          <!-- ========== STATS CARDS ========== -->
+          <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-6">
+            <!-- 任务总数 -->
+            <div class="rounded-xl p-4 transition-all duration-200" style="background:var(--color-bg-panel);border:1px solid var(--color-border);" onmouseover="this.style.borderColor='var(--color-border-glow)'" onmouseout="this.style.borderColor='var(--color-border)'">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-lg flex items-center justify-center shrink-0" style="background:rgba(66,165,245,0.15);">
+                  <i data-lucide="layers" class="w-5 h-5" style="color:var(--state-info);"></i>
+                </div>
+                <div class="min-w-0">
+                  <div class="text-2xl font-bold" id="stat-total" style="color:var(--color-text-primary);">--</div>
+                  <div class="text-xs mt-0.5" style="color:var(--color-text-muted);">任务总数</div>
+                </div>
+              </div>
+            </div>
+            <!-- 进行中 -->
+            <div class="rounded-xl p-4 transition-all duration-200" style="background:var(--color-bg-panel);border:1px solid var(--color-border);" onmouseover="this.style.borderColor='var(--color-border-glow)'" onmouseout="this.style.borderColor='var(--color-border)'">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-lg flex items-center justify-center shrink-0" style="background:rgba(255,215,0,0.15);">
+                  <i data-lucide="loader" class="w-5 h-5 animate-spin" style="color:var(--color-primary);"></i>
+                </div>
+                <div class="min-w-0">
+                  <div class="text-2xl font-bold" id="stat-running" style="color:var(--color-primary);">--</div>
+                  <div class="text-xs mt-0.5" style="color:var(--color-text-muted);">进行中</div>
+                </div>
+              </div>
+            </div>
+            <!-- 已完成 -->
+            <div class="rounded-xl p-4 transition-all duration-200" style="background:var(--color-bg-panel);border:1px solid var(--color-border);" onmouseover="this.style.borderColor='var(--color-border-glow)'" onmouseout="this.style.borderColor='var(--color-border)'">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-lg flex items-center justify-center shrink-0" style="background:rgba(102,187,106,0.15);">
+                  <i data-lucide="check-circle-2" class="w-5 h-5" style="color:var(--state-success);"></i>
+                </div>
+                <div class="min-w-0">
+                  <div class="text-2xl font-bold" id="stat-completed" style="color:var(--state-success);">--</div>
+                  <div class="text-xs mt-0.5" style="color:var(--color-text-muted);">已完成</div>
+                </div>
+              </div>
+            </div>
+            <!-- 失败数 -->
+            <div class="rounded-xl p-4 transition-all duration-200" style="background:var(--color-bg-panel);border:1px solid var(--color-border);" onmouseover="this.style.borderColor='var(--color-border-glow)'" onmouseout="this.style.borderColor='var(--color-border)'">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-lg flex items-center justify-center shrink-0" style="background:rgba(239,83,80,0.15);">
+                  <i data-lucide="alert-circle" class="w-5 h-5" style="color:var(--state-error);"></i>
+                </div>
+                <div class="min-w-0">
+                  <div class="text-2xl font-bold" id="stat-failed" style="color:var(--state-error);">--</div>
+                  <div class="text-xs mt-0.5" style="color:var(--color-text-muted);">失败</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ========== FILTER & SEARCH BAR ========== -->
+          <div class="rounded-xl p-3 md:p-4 mb-6" style="background:var(--color-bg-panel);border:1px solid var(--color-border);">
+            <div class="flex flex-col lg:flex-row lg:items-center gap-3">
+              <!-- Status filter pills -->
+              <div class="flex items-center gap-1.5 overflow-x-auto no-scrollbar flex-1 min-w-0">
+                <button data-filter-status="all" class="filter-status-btn shrink-0 text-xs px-3 py-1.5 rounded-lg whitespace-nowrap font-medium transition-all duration-200" style="background:var(--color-primary);color:#0a0e27;">
+                  <span class="inline-flex items-center gap-1">
+                    <i data-lucide="grid-2x2" class="w-3.5 h-3.5"></i>
+                    全部
+                  </span>
+                </button>
+                <button data-filter-status="running" class="filter-status-btn shrink-0 text-xs px-3 py-1.5 rounded-lg whitespace-nowrap transition-all duration-200" style="background:var(--color-bg-elevated);color:var(--color-text-muted);" onmouseover="this.style.background='var(--color-bg-hover)'" onmouseout="this.style.background='var(--color-bg-elevated)'">
+                  <span class="inline-flex items-center gap-1">
+                    <span class="w-1.5 h-1.5 rounded-full" style="background:var(--color-primary);"></span>
+                    进行中
+                  </span>
+                </button>
+                <button data-filter-status="pending" class="filter-status-btn shrink-0 text-xs px-3 py-1.5 rounded-lg whitespace-nowrap transition-all duration-200" style="background:var(--color-bg-elevated);color:var(--color-text-muted);" onmouseover="this.style.background='var(--color-bg-hover)'" onmouseout="this.style.background='var(--color-bg-elevated)'">
+                  <span class="inline-flex items-center gap-1">
+                    <span class="w-1.5 h-1.5 rounded-full" style="background:var(--color-text-muted);"></span>
+                    等待
+                  </span>
+                </button>
+                <button data-filter-status="completed" class="filter-status-btn shrink-0 text-xs px-3 py-1.5 rounded-lg whitespace-nowrap transition-all duration-200" style="background:var(--color-bg-elevated);color:var(--color-text-muted);" onmouseover="this.style.background='var(--color-bg-hover)'" onmouseout="this.style.background='var(--color-bg-elevated)'">
+                  <span class="inline-flex items-center gap-1">
+                    <span class="w-1.5 h-1.5 rounded-full" style="background:var(--state-success);"></span>
+                    完成
+                  </span>
+                </button>
+                <button data-filter-status="failed" class="filter-status-btn shrink-0 text-xs px-3 py-1.5 rounded-lg whitespace-nowrap transition-all duration-200" style="background:var(--color-bg-elevated);color:var(--color-text-muted);" onmouseover="this.style.background='var(--color-bg-hover)'" onmouseout="this.style.background='var(--color-bg-elevated)'">
+                  <span class="inline-flex items-center gap-1">
+                    <span class="w-1.5 h-1.5 rounded-full" style="background:var(--state-error);"></span>
+                    失败
+                  </span>
+                </button>
+              </div>
+              <!-- Search & Star Filter -->
+              <div class="shrink-0 flex items-center gap-2">
+                <div class="relative">
+                  <i data-lucide="search" class="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2" style="color:var(--color-text-muted);"></i>
+                  <input type="text" id="search-input" placeholder="搜索任务..." class="text-xs pl-8 pr-3 py-1.5 rounded-lg border outline-none transition-colors duration-200 w-40 md:w-48" style="background:var(--color-bg-card);color:var(--color-text-primary);border-color:var(--color-border);" onfocus="this.style.borderColor='var(--color-primary)';this.style.boxShadow='0 0 0 2px var(--color-primary-dim)'" onblur="this.style.borderColor='var(--color-border)';this.style.boxShadow='none'">
+                </div>
+                <select id="star-filter" class="text-xs px-2.5 py-1.5 rounded-lg border outline-none cursor-pointer transition-colors duration-200" style="background:var(--color-bg-card);color:var(--color-text-secondary);border-color:var(--color-border);" onfocus="this.style.borderColor='var(--color-primary)';this.style.boxShadow='0 0 0 2px var(--color-primary-dim)'" onblur="this.style.borderColor='var(--color-border)';this.style.boxShadow='none'">
+                  <option value="all">全部星体</option>
+                  <option value="Trae">Trae</option>
+                  <option value="Cursor">Cursor</option>
+                  <option value="Claude">Claude</option>
+                  <option value="CodeArts">CodeArts</option>
+                  <option value="Windsurf">Windsurf</option>
+                  <option value="Copilot">Copilot</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- ========== MAIN CONTENT: TIMELINE + SIDEBAR ========== -->
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+            <!-- ========== LEFT: TIMELINE (2/3) ========== -->
+            <section class="lg:col-span-2 flex flex-col min-w-0">
+              <div class="flex items-center justify-between mb-4">
+                <div class="flex items-center gap-2">
+                  <i data-lucide="git-commit-horizontal" class="w-5 h-5" style="color:var(--color-primary);"></i>
+                  <h2 class="text-lg font-semibold" style="color:var(--color-text-primary);">任务时间线</h2>
+                  <span class="text-xs px-2 py-0.5 rounded-full font-mono" id="timeline-count" style="background:var(--color-primary-dim);color:var(--color-primary);">--</span>
+                </div>
+                <span class="text-xs" style="color:var(--color-text-muted);">最近 20 条</span>
+              </div>
+
+              <!-- Timeline Container -->
+              <div class="relative" id="timeline-container">
+                <!-- Timeline will be rendered here -->
+                <div class="text-center py-12" style="color:var(--color-text-muted);">
+                  <i data-lucide="loader-2" class="w-8 h-8 animate-spin mx-auto mb-3" style="color:var(--color-primary);"></i>
+                  <div class="text-sm">加载中...</div>
+                </div>
+              </div>
+            </section>
+
+            <!-- ========== RIGHT: QUEUE PANEL (1/3) ========== -->
+            <section class="lg:col-span-1 min-w-0 flex flex-col gap-4">
+
+              <!-- Queue Management -->
+              <div class="rounded-xl p-4" style="background:var(--color-bg-panel);border:1px solid var(--color-border);">
+                <div class="flex items-center gap-2 mb-4">
+                  <i data-lucide="list-ordered" class="w-5 h-5" style="color:var(--color-primary);"></i>
+                  <h3 class="text-sm font-semibold" style="color:var(--color-text-primary);">队列管理</h3>
+                </div>
+
+                <!-- Current Running (highlighted) -->
+                <div class="mb-4">
+                  <div class="flex items-center gap-1.5 mb-2">
+                    <span class="w-1.5 h-1.5 rounded-full animate-pulse" style="background:var(--color-primary);"></span>
+                    <span class="text-xs font-medium" style="color:var(--color-primary);">当前运行</span>
+                  </div>
+                  <div id="current-running-list" class="flex flex-col gap-2">
+                    <!-- rendered by JS -->
+                  </div>
+                </div>
+
+                <!-- Waiting Queue -->
+                <div class="mb-4">
+                  <div class="flex items-center justify-between mb-2">
+                    <div class="flex items-center gap-1.5">
+                      <span class="w-1.5 h-1.5 rounded-full" style="background:var(--color-text-muted);"></span>
+                      <span class="text-xs font-medium" style="color:var(--color-text-secondary);">等待队列</span>
+                      <span class="text-[10px] px-1.5 py-0.5 rounded-full font-mono" id="waiting-count" style="background:var(--color-bg-elevated);color:var(--color-text-muted);">--</span>
+                    </div>
+                  </div>
+                  <div id="waiting-queue-list" class="flex flex-col gap-1.5 max-h-48 overflow-y-auto no-scrollbar">
+                    <!-- rendered by JS -->
+                  </div>
+                </div>
+
+                <!-- Completed History (collapsible) -->
+                <div>
+                  <button id="history-toggle" class="w-full flex items-center justify-between mb-2" onclick="toggleHistory()">
+                    <div class="flex items-center gap-1.5">
+                      <span class="w-1.5 h-1.5 rounded-full" style="background:var(--state-success);"></span>
+                      <span class="text-xs font-medium" style="color:var(--color-text-secondary);">已完成历史</span>
+                    </div>
+                    <i data-lucide="chevron-down" class="w-4 h-4 transition-transform duration-200" id="history-chevron" style="color:var(--color-text-muted);"></i>
+                  </button>
+                  <div id="history-list" class="flex flex-col gap-1.5 max-h-0 overflow-hidden transition-all duration-300">
+                    <!-- rendered by JS -->
+                  </div>
+                </div>
+              </div>
+
+              <!-- Create Nova Form -->
+              <div class="rounded-xl p-4" style="background:var(--color-bg-panel);border:1px solid var(--color-border);">
+                <div class="flex items-center gap-2 mb-4">
+                  <i data-lucide="plus-circle" class="w-5 h-5" style="color:var(--color-primary);"></i>
+                  <h3 class="text-sm font-semibold" style="color:var(--color-text-primary);">诞生新星</h3>
+                </div>
+
+                <form id="create-nova-form" class="flex flex-col gap-3" onsubmit="return false;">
+                  <div>
+                    <label class="block text-xs font-medium mb-1" style="color:var(--color-text-secondary);">任务标题</label>
+                    <input type="text" placeholder="输入任务标题..." id="nova-title" class="w-full text-xs px-2.5 py-2 rounded-lg border outline-none transition-colors duration-200" style="background:var(--color-bg-card);color:var(--color-text-primary);border-color:var(--color-border);" onfocus="this.style.borderColor='var(--color-primary)';this.style.boxShadow='0 0 0 2px var(--color-primary-dim)'" onblur="this.style.borderColor='var(--color-border)';this.style.boxShadow='none'">
+                  </div>
+
+                  <div>
+                    <label class="block text-xs font-medium mb-1" style="color:var(--color-text-secondary);">星光指令</label>
+                    <textarea rows="3" placeholder="发送给 AI Agent 的指令..." id="nova-starlight" class="w-full text-xs px-2.5 py-2 rounded-lg border outline-none transition-colors duration-200 resize-none" style="background:var(--color-bg-card);color:var(--color-text-primary);border-color:var(--color-border);font-family:var(--font-mono);" onfocus="this.style.borderColor='var(--color-primary)';this.style.boxShadow='0 0 0 2px var(--color-primary-dim)'" onblur="this.style.borderColor='var(--color-border)';this.style.boxShadow='none'"></textarea>
+                  </div>
+
+                  <div class="grid grid-cols-2 gap-2">
+                    <div>
+                      <label class="block text-xs font-medium mb-1" style="color:var(--color-text-secondary);">目标星体</label>
+                      <select id="nova-star" class="w-full text-xs px-2 py-2 rounded-lg border outline-none cursor-pointer transition-colors duration-200" style="background:var(--color-bg-card);color:var(--color-text-primary);border-color:var(--color-border);" onfocus="this.style.borderColor='var(--color-primary)';this.style.boxShadow='0 0 0 2px var(--color-primary-dim)'" onblur="this.style.borderColor='var(--color-border)';this.style.boxShadow='none'">
+                        <option value="">自动</option>
+                        <option value="Trae">Trae</option>
+                        <option value="Cursor">Cursor</option>
+                        <option value="Claude">Claude</option>
+                        <option value="CodeArts">CodeArts</option>
+                        <option value="Windsurf">Windsurf</option>
+                        <option value="Copilot">Copilot</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label class="block text-xs font-medium mb-1" style="color:var(--color-text-secondary);">优先级</label>
+                      <select id="nova-priority" class="w-full text-xs px-2 py-2 rounded-lg border outline-none cursor-pointer transition-colors duration-200" style="background:var(--color-bg-card);color:var(--color-text-primary);border-color:var(--color-border);" onfocus="this.style.borderColor='var(--color-primary)';this.style.boxShadow='0 0 0 2px var(--color-primary-dim)'" onblur="this.style.borderColor='var(--color-border)';this.style.boxShadow='none'">
+                        <option value="0">暗星</option>
+                        <option value="1" selected>常星</option>
+                        <option value="2">亮星</option>
+                        <option value="3">超新星</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <button type="submit" class="w-full text-xs font-semibold px-4 py-2 rounded-lg transition-all duration-200 flex items-center justify-center gap-1.5" style="background:var(--color-primary);color:#0a0e27;" onmouseover="this.style.boxShadow='var(--shadow-glow)'" onmouseout="this.style.boxShadow='none'">
+                    <i data-lucide="zap" class="w-3.5 h-3.5"></i>
+                    新星诞生
+                  </button>
+                </form>
+              </div>
+
+              <!-- Constellation Collaboration (preserved) -->
+              <div class="rounded-xl p-4" style="background:var(--color-bg-panel);border:1px solid var(--color-border);">
+                <div class="flex items-center gap-2 mb-4">
+                  <i data-lucide="orbit" class="w-5 h-5" style="color:var(--color-primary);"></i>
+                  <h3 class="text-sm font-semibold" style="color:var(--color-text-primary);">星座协作</h3>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                  <div class="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg" style="background:var(--color-bg-elevated);color:var(--color-text-secondary);">
+                    <span class="w-2 h-2 rounded-full" style="background:var(--color-status-shining);"></span>
+                    Trae
+                  </div>
+                  <div class="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg" style="background:var(--color-bg-elevated);color:var(--color-text-secondary);">
+                    <span class="w-2 h-2 rounded-full" style="background:var(--color-status-orbiting);"></span>
+                    Cursor
+                  </div>
+                  <div class="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg" style="background:var(--color-bg-elevated);color:var(--color-text-secondary);">
+                    <span class="w-2 h-2 rounded-full" style="background:var(--color-status-shining);"></span>
+                    Claude
+                  </div>
+                  <div class="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg" style="background:var(--color-bg-elevated);color:var(--color-text-secondary);">
+                    <span class="w-2 h-2 rounded-full" style="background:var(--color-status-awaiting);"></span>
+                    CodeArts
+                  </div>
+                </div>
+              </div>
+
+            </section>
+
+          </div>
+        </div>
+      </div>
+    </main>
+    <script>lucide.createIcons();</script>
+    <script>
+    // ===== 状态映射配置 =====
+    const TIMELINE_STATUS_MAP = {
+      nascent: { group: 'pending', label: '等待中', color: 'var(--color-text-muted)', dot: 'var(--color-text-muted)' },
+      orbiting: { group: 'running', label: '进行中', color: 'var(--color-primary)', dot: 'var(--color-primary)' },
+      shining: { group: 'running', label: '进行中', color: 'var(--color-primary)', dot: 'var(--color-primary)' },
+      awaiting: { group: 'running', label: '待回响', color: 'var(--state-warning)', dot: 'var(--state-warning)' },
+      constellated: { group: 'completed', label: '已完成', color: 'var(--state-success)', dot: 'var(--state-success)' },
+      faded: { group: 'failed', label: '失败', color: 'var(--state-error)', dot: 'var(--state-error)' },
+      darkened: { group: 'failed', label: '已熄灭', color: 'var(--state-error)', dot: 'var(--state-error)' },
+    };
+
+    const PRIORITY_CONFIG = {
+      0: { label: '暗星', color: 'var(--color-star-dim)', icon: 'star' },
+      1: { label: '常星', color: 'var(--color-star-normal)', icon: 'star' },
+      2: { label: '亮星', color: 'var(--color-star-bright)', icon: 'star' },
+      3: { label: '超新星', color: 'var(--color-star-supernova)', icon: 'sparkles' },
+    };
+
+    // ===== Mock 数据 =====
+    const MOCK_NOVAS = [
+      { id: 'a1b2c3d4', title: '生成用户登录模块', status: 'shining', priority: 1, assigned_star: 'Trae', created_at: Date.now() - 120000, progress: 65 },
+      { id: 'e5f6g7h8', title: '审查安全漏洞', status: 'orbiting', priority: 2, assigned_star: 'CodeArts', created_at: Date.now() - 300000, progress: 30 },
+      { id: 'i9j0k1l2', title: '重构数据库层', status: 'nascent', priority: 3, assigned_star: 'Cursor', created_at: Date.now() - 10000, progress: 0 },
+      { id: 'm3n4o5p6', title: '生成API文档', status: 'awaiting', priority: 1, assigned_star: 'Claude', created_at: Date.now() - 900000, progress: 100 },
+      { id: 'q7r8s9t0', title: '优化前端性能', status: 'constellated', priority: 0, assigned_star: 'Trae', created_at: Date.now() - 3600000, progress: 100 },
+      { id: 'u1v2w3x4', title: '编写单元测试', status: 'faded', priority: 1, assigned_star: 'Copilot', created_at: Date.now() - 7200000, progress: 45 },
+      { id: 'y5z6a7b8', title: '迁移到微服务', status: 'darkened', priority: 2, assigned_star: null, created_at: Date.now() - 10800000, progress: 20 },
+      { id: 'c9d0e1f2', title: '实现缓存机制', status: 'nascent', priority: 1, assigned_star: 'Windsurf', created_at: Date.now() - 5000, progress: 0 },
+      { id: 'd2e3f4g5', title: '设计系统升级', status: 'constellated', priority: 2, assigned_star: 'Trae', created_at: Date.now() - 86400000, progress: 100 },
+      { id: 'f6g7h8i9', title: '支付模块集成', status: 'shining', priority: 3, assigned_star: 'Cursor', created_at: Date.now() - 600000, progress: 80 },
+      { id: 'h0i1j2k3', title: '国际化支持', status: 'orbiting', priority: 1, assigned_star: 'Claude', created_at: Date.now() - 1800000, progress: 50 },
+      { id: 'j4k5l6m7', title: '数据可视化大屏', status: 'nascent', priority: 2, assigned_star: null, created_at: Date.now() - 30000, progress: 0 },
+    ];
+
+    // ===== 全局状态 =====
+    let allNovas = [];
+    let currentFilter = { status: 'all', search: '', star: 'all' };
+    let historyExpanded = false;
+
+    // ===== 工具函数 =====
+    function escapeHtml(str) {
+      if (!str) return '';
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    function timeAgo(timestamp) {
+      if (!timestamp) return '—';
+      const t = typeof timestamp === 'string' ? new Date(timestamp).getTime() : timestamp;
+      const diff = Date.now() - t;
+      const mins = Math.floor(diff / 60000);
+      if (mins < 1) return '刚刚';
+      if (mins < 60) return `${mins}分钟前`;
+      const hours = Math.floor(mins / 60);
+      if (hours < 24) return `${hours}小时前`;
+      const days = Math.floor(hours / 24);
+      return `${days}天前`;
+    }
+
+    function formatTime(timestamp) {
+      if (!timestamp) return '—';
+      const t = typeof timestamp === 'string' ? new Date(timestamp) : new Date(timestamp);
+      const pad = n => String(n).padStart(2, '0');
+      return `${pad(t.getMonth()+1)}-${pad(t.getDate())} ${pad(t.getHours())}:${pad(t.getMinutes())}`;
+    }
+
+    // ===== 数据加载 =====
+    async function loadOrbitData() {
+      try {
+        const res = await novaApi.list();
+        allNovas = res.novas || [];
+      } catch(e) {
+        console.warn('Orbit API load failed, using mock data:', e);
+        allNovas = MOCK_NOVAS;
+      }
+      renderAll();
+    }
+
+    // ===== 渲染函数 =====
+    function renderAll() {
+      updateStats();
+      renderTimeline();
+      renderQueuePanel();
+      lucide.createIcons();
+    }
+
+    function updateStats() {
+      const total = allNovas.length;
+      const running = allNovas.filter(n => TIMELINE_STATUS_MAP[n.status]?.group === 'running').length;
+      const completed = allNovas.filter(n => TIMELINE_STATUS_MAP[n.status]?.group === 'completed').length;
+      const failed = allNovas.filter(n => TIMELINE_STATUS_MAP[n.status]?.group === 'failed').length;
+
+      document.getElementById('stat-total').textContent = total;
+      document.getElementById('stat-running').textContent = running;
+      document.getElementById('stat-completed').textContent = completed;
+      document.getElementById('stat-failed').textContent = failed;
+
+      const pending = allNovas.filter(n => TIMELINE_STATUS_MAP[n.status]?.group === 'pending').length;
+      document.getElementById('header-queue-count').innerHTML = `队列: <span class="font-semibold" style="color:var(--color-primary);">${pending} 待发射</span>`;
+    }
+
+    function getFilteredNovas() {
+      return allNovas.filter(nova => {
+        const statusGroup = TIMELINE_STATUS_MAP[nova.status]?.group || 'pending';
+        if (currentFilter.status !== 'all' && statusGroup !== currentFilter.status) return false;
+        if (currentFilter.search && !nova.title.toLowerCase().includes(currentFilter.search.toLowerCase())) return false;
+        if (currentFilter.star !== 'all' && nova.assigned_star !== currentFilter.star) return false;
+        return true;
+      }).sort((a, b) => (b.created_at || 0) - (a.created_at || 0)).slice(0, 20);
+    }
+
+    function renderTimeline() {
+      const container = document.getElementById('timeline-container');
+      const filtered = getFilteredNovas();
+      
+      document.getElementById('timeline-count').textContent = filtered.length;
+
+      if (filtered.length === 0) {
+        container.innerHTML = `
+          <div class="text-center py-12" style="color:var(--color-text-muted);">
+            <i data-lucide="inbox" class="w-12 h-12 mx-auto mb-3" style="opacity:0.5;"></i>
+            <div class="text-sm">暂无匹配的任务</div>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = `
+        <div class="absolute left-4 top-2 bottom-2 w-px" style="background:var(--color-border);"></div>
+        <div class="flex flex-col gap-0">
+          ${filtered.map((nova, index) => {
+            const sl = TIMELINE_STATUS_MAP[nova.status] || TIMELINE_STATUS_MAP.nascent;
+            const pc = PRIORITY_CONFIG[nova.priority] || PRIORITY_CONFIG[1];
+            const isLast = index === filtered.length - 1;
+            const showProgress = (sl.group === 'running') && (typeof nova.progress === 'number');
+            
+            return `
+              <div class="relative pl-10 ${isLast ? '' : 'pb-5'}">
+                <div class="absolute left-[11px] top-1.5 w-3.5 h-3.5 rounded-full border-2 z-10" 
+                     style="background:var(--color-bg-deep);border-color:${sl.dot};box-shadow:0 0 0 4px var(--color-bg-deep);">
+                  ${sl.group === 'running' ? `<div class="absolute inset-0 rounded-full animate-ping" style="background:${sl.dot};opacity:0.4;"></div>` : ''}
+                </div>
+                <div class="rounded-lg p-3 transition-all duration-200 cursor-pointer" 
+                     style="background:var(--color-bg-panel);border:1px solid var(--color-border);"
+                     onmouseover="this.style.borderColor='var(--color-border-glow)';this.style.background='var(--color-bg-hover)'" 
+                     onmouseout="this.style.borderColor='var(--color-border)';this.style.background='var(--color-bg-panel)'">
+                  <div class="flex items-start justify-between gap-2 mb-2">
+                    <div class="flex-1 min-w-0">
+                      <div class="flex items-center gap-2 flex-wrap">
+                        <span class="text-sm font-medium truncate" style="color:var(--color-text-primary);">${escapeHtml(nova.title)}</span>
+                      </div>
+                      <div class="flex items-center gap-2 mt-1 flex-wrap">
+                        <span class="inline-flex items-center text-[10px] px-2 py-0.5 rounded-full whitespace-nowrap font-medium" 
+                              style="background:${sl.dot}20;color:${sl.color};">${sl.label}</span>
+                        <span class="inline-flex items-center text-[10px] px-2 py-0.5 rounded-full whitespace-nowrap gap-1" 
+                              style="background:rgba(255,255,255,0.05);color:${pc.color};">
+                          <i data-lucide="${pc.icon}" class="w-3 h-3"></i>
+                          ${pc.label}
+                        </span>
+                        <span class="inline-flex items-center text-[10px] gap-1 whitespace-nowrap" style="color:var(--color-text-muted);">
+                          <i data-lucide="cpu" class="w-3 h-3"></i>
+                          ${nova.assigned_star || '自动路由'}
+                        </span>
+                      </div>
+                    </div>
+                    <div class="shrink-0 text-right">
+                      <div class="text-[10px] font-mono" style="color:var(--color-text-muted);">${escapeHtml(nova.id)}</div>
+                      <div class="text-[10px] mt-0.5" style="color:var(--color-text-muted);">${formatTime(nova.created_at)}</div>
+                    </div>
+                  </div>
+                  ${showProgress ? `
+                    <div class="mt-2">
+                      <div class="flex items-center justify-between mb-1">
+                        <span class="text-[10px]" style="color:var(--color-text-muted);">进度</span>
+                        <span class="text-[10px] font-mono font-medium" style="color:${sl.color};">${nova.progress}%</span>
+                      </div>
+                      <div class="h-1.5 rounded-full overflow-hidden" style="background:var(--color-bg-deep);">
+                        <div class="h-full rounded-full transition-all duration-500 ease-out" 
+                             style="width:${nova.progress}%;background:linear-gradient(90deg,${sl.dot},${sl.color});"></div>
+                      </div>
+                    </div>
+                  ` : ''}
+                  <div class="flex items-center gap-1.5 mt-3">
+                    ${nova.status === 'nascent' ? `<button class="text-[11px] px-2.5 py-1 rounded-md font-medium transition-colors duration-200" style="background:var(--color-primary);color:#0a0e27;" onclick="event.stopPropagation();doLaunch('${nova.id}')">发射</button>` : ''}
+                    ${nova.status === 'shining' ? `<button class="text-[11px] px-2.5 py-1 rounded-md font-medium transition-colors duration-200" style="background:var(--color-bg-elevated);color:var(--color-text-secondary);border:1px solid var(--color-border);" onmouseover="this.style.borderColor='var(--color-border-glow)';this.style.color='var(--color-primary)'" onmouseout="this.style.borderColor='var(--color-border)';this.style.color='var(--color-text-secondary)'" onclick="event.stopPropagation();doAdjust('${nova.id}')">调整</button>` : ''}
+                    ${nova.status === 'awaiting' ? `<button class="text-[11px] px-2.5 py-1 rounded-md font-medium transition-colors duration-200" style="background:var(--color-bg-elevated);color:var(--color-text-secondary);border:1px solid var(--color-border);" onmouseover="this.style.borderColor='var(--color-border-glow)';this.style.color='var(--color-primary)'" onmouseout="this.style.borderColor='var(--color-border)';this.style.color='var(--color-text-secondary)'" onclick="event.stopPropagation();doEcho('${nova.id}')">回响</button>` : ''}
+                    <button class="text-[11px] px-2.5 py-1 rounded-md font-medium transition-colors duration-200" style="background:var(--color-bg-elevated);color:var(--color-text-secondary);border:1px solid var(--color-border);" onmouseover="this.style.borderColor='var(--color-border-glow)';this.style.color='var(--color-primary)'" onmouseout="this.style.borderColor='var(--color-border)';this.style.color='var(--color-text-secondary)'" onclick="event.stopPropagation();location.href='/ui/pages/starlight.html'">详情</button>
+                  </div>
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      `;
+    }
+
+    function renderQueuePanel() {
+      const running = allNovas.filter(n => TIMELINE_STATUS_MAP[n.status]?.group === 'running')
+        .sort((a, b) => (b.created_at || 0) - (a.created_at || 0));
+      const pending = allNovas.filter(n => TIMELINE_STATUS_MAP[n.status]?.group === 'pending')
+        .sort((a, b) => (b.priority || 0) - (a.priority || 0) || (b.created_at || 0) - (a.created_at || 0));
+      const completed = allNovas.filter(n => TIMELINE_STATUS_MAP[n.status]?.group === 'completed')
+        .sort((a, b) => (b.created_at || 0) - (a.created_at || 0)).slice(0, 10);
+
+      document.getElementById('waiting-count').textContent = pending.length;
+
+      const renderQueueItem = (nova, highlight = false) => {
+        const pc = PRIORITY_CONFIG[nova.priority] || PRIORITY_CONFIG[1];
+        return `
+          <div class="rounded-lg p-2.5 transition-all duration-200 cursor-pointer ${highlight ? '' : ''}" 
+               style="background:${highlight ? 'var(--color-primary-dim)' : 'var(--color-bg-card)'};border:1px solid ${highlight ? 'var(--color-primary)' : 'var(--color-border)'};"
+               onmouseover="this.style.borderColor='var(--color-border-glow)'" 
+               onmouseout="this.style.borderColor='${highlight ? 'var(--color-primary)' : 'var(--color-border)'}'">
+            <div class="flex items-center gap-2">
+              <i data-lucide="${pc.icon}" class="w-3.5 h-3.5 shrink-0" style="color:${pc.color};"></i>
+              <div class="flex-1 min-w-0">
+                <div class="text-xs font-medium truncate" style="color:var(--color-text-primary);">${escapeHtml(nova.title)}</div>
+                <div class="text-[10px] truncate" style="color:var(--color-text-muted);">${nova.assigned_star || '自动'} · ${timeAgo(nova.created_at)}</div>
+              </div>
+            </div>
+          </div>
+        `;
+      };
+
+      const runningList = document.getElementById('current-running-list');
+      if (running.length === 0) {
+        runningList.innerHTML = `<div class="text-xs text-center py-2" style="color:var(--color-text-muted);">暂无运行任务</div>`;
+      } else {
+        runningList.innerHTML = running.map(n => renderQueueItem(n, true)).join('');
+      }
+
+      const waitingList = document.getElementById('waiting-queue-list');
+      if (pending.length === 0) {
+        waitingList.innerHTML = `<div class="text-xs text-center py-2" style="color:var(--color-text-muted);">队列为空</div>`;
+      } else {
+        waitingList.innerHTML = pending.map(n => renderQueueItem(n)).join('');
+      }
+
+      const historyList = document.getElementById('history-list');
+      if (completed.length === 0) {
+        historyList.innerHTML = `<div class="text-xs text-center py-2" style="color:var(--color-text-muted);">暂无历史</div>`;
+      } else {
+        historyList.innerHTML = completed.map(n => renderQueueItem(n)).join('');
+      }
+    }
+
+    // ===== 交互函数 =====
+    function toggleHistory() {
+      historyExpanded = !historyExpanded;
+      const list = document.getElementById('history-list');
+      const chevron = document.getElementById('history-chevron');
+      if (historyExpanded) {
+        list.style.maxHeight = '320px';
+        chevron.style.transform = 'rotate(180deg)';
+      } else {
+        list.style.maxHeight = '0';
+        chevron.style.transform = 'rotate(0deg)';
+      }
+    }
+
+    async function doLaunch(id) {
+      try { await novaApi.launch(id); loadOrbitData(); } catch(e) { alert('发射失败: ' + e.message); }
+    }
+    async function doAdjust(id) {
+      const msg = prompt('输入新的星光指令:');
+      if (!msg) return;
+      try { await novaApi.adjust(id, msg); loadOrbitData(); } catch(e) { alert('调整失败: ' + e.message); }
+    }
+    async function doEcho(id) {
+      const msg = prompt('输入回响内容:');
+      if (!msg) return;
+      try { await novaApi.echo(id, msg); loadOrbitData(); } catch(e) { alert('回响失败: ' + e.message); }
+    }
+
+    // ===== 筛选事件绑定 =====
+    document.querySelectorAll('.filter-status-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const status = btn.dataset.filterStatus;
+        currentFilter.status = status;
+        document.querySelectorAll('.filter-status-btn').forEach(b => {
+          b.style.background = 'var(--color-bg-elevated)';
+          b.style.color = 'var(--color-text-muted)';
+        });
+        btn.style.background = 'var(--color-primary)';
+        btn.style.color = '#0a0e27';
+        renderTimeline();
+        lucide.createIcons();
+      });
+    });
+
+    document.getElementById('search-input').addEventListener('input', (e) => {
+      currentFilter.search = e.target.value;
+      renderTimeline();
+      lucide.createIcons();
+    });
+
+    document.getElementById('star-filter').addEventListener('change', (e) => {
+      currentFilter.star = e.target.value;
+      renderTimeline();
+      lucide.createIcons();
+    });
+
+    // ===== 创建新星表单 =====
+    document.getElementById('create-nova-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const title = document.getElementById('nova-title').value.trim();
+      const starlight = document.getElementById('nova-starlight').value.trim();
+      const assigned_star = document.getElementById('nova-star').value || null;
+      const priority = parseInt(document.getElementById('nova-priority').value);
+
+      if (!title) {
+        alert('请输入任务标题');
+        return;
+      }
+
+      try {
+        await novaApi.create({
+          title,
+          description: '',
+          starlight,
+          assigned_star,
+          priority,
+        });
+        alert('新星已诞生!');
+        document.getElementById('create-nova-form').reset();
+        loadOrbitData();
+      } catch(e) {
+        console.warn('Create failed, adding mock:', e);
+        const mockNova = {
+          id: Math.random().toString(36).substr(2, 8),
+          title,
+          status: 'nascent',
+          priority,
+          assigned_star,
+          created_at: Date.now(),
+          progress: 0,
+        };
+        allNovas.unshift(mockNova);
+        alert('新星已诞生! (演示模式)');
+        document.getElementById('create-nova-form').reset();
+        renderAll();
+      }
+    });
+
+    // ===== 初始化 =====
+    addNavListeners();
+    loadOrbitData();
+    </script>
+</body>
+</html>

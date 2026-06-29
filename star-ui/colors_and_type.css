@@ -1,0 +1,126 @@
+/* ============================================
+   群星 Star — Brand Design Tokens
+   Deep Space Theme
+   ============================================ */
+
+:root {
+  /* === Primary Palette === */
+  --color-bg-deep: #0a0e27;
+  --color-bg-panel: #1a1f3a;
+  --color-bg-card: #151934;
+  --color-bg-elevated: #212647;
+  --color-bg-hover: #2a3058;
+
+  /* === Accent: Starlight Gold === */
+  --color-primary: #ffd700;
+  --color-primary-dim: rgba(255, 215, 0, 0.15);
+  --color-primary-muted: rgba(255, 215, 0, 0.6);
+  --color-primary-glow: rgba(255, 215, 0, 0.25);
+
+  /* === Star Magnitude Colors === */
+  --color-star-supernova: #ffffff;
+  --color-star-bright: #4fc3f7;
+  --color-star-normal: #b0bec5;
+  --color-star-dim: #616161;
+
+  /* === Star Status Colors === */
+  --color-status-shining: #66bb6a;
+  --color-status-awaiting: #ffa726;
+  --color-status-faded: #ef5350;
+  --color-status-nascent: #ab47bc;
+  --color-status-orbiting: #42a5f5;
+  --color-status-constellated: #ffd700;
+  --color-status-darkened: #455a64;
+
+  /* === Semantic State === */
+  --state-success: #66bb6a;
+  --state-warning: #ffa726;
+  --state-error: #ef5350;
+  --state-info: #42a5f5;
+
+  /* === Text === */
+  --color-text-primary: #e8eaf6;
+  --color-text-secondary: #9fa8da;
+  --color-text-muted: #616885;
+  --color-text-gold: #ffd700;
+
+  /* === Border === */
+  --color-border: rgba(255, 255, 255, 0.08);
+  --color-border-subtle: rgba(255, 255, 255, 0.04);
+  --color-border-glow: rgba(255, 215, 0, 0.2);
+
+  /* === Surface Depth === */
+  --surface-1: #0a0e27;
+  --surface-2: #1a1f3a;
+  --surface-3: #212647;
+  --surface-4: #2a3058;
+
+  /* === Typography === */
+  --font-display: 'Inter', 'Noto Sans SC', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+  --font-body: var(--font-display);
+
+  /* === Font Sizes === */
+  --text-xs: 0.75rem;
+  --text-sm: 0.8125rem;
+  --text-base: 0.875rem;
+  --text-lg: 1rem;
+  --text-xl: 1.125rem;
+  --text-2xl: 1.5rem;
+  --text-3xl: 1.875rem;
+  --text-4xl: 2.25rem;
+
+  /* === Radius === */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-full: 9999px;
+
+  /* === Spacing === */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 12px;
+  --space-lg: 16px;
+  --space-xl: 24px;
+  --space-2xl: 32px;
+  --space-3xl: 48px;
+
+  /* === Shadows (static surfaces: border-first, alpha <= 0.05) === */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.05);
+  /* Floating layers only (modal, drawer, tooltip) */
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.15);
+  --shadow-glow: 0 0 20px rgba(255, 215, 0, 0.15);
+
+  /* === Transitions === */
+  --transition-fast: 150ms ease;
+  --transition-normal: 250ms ease;
+  --transition-slow: 400ms ease;
+}
+
+/* === Typography Classes === */
+.font-display { font-family: var(--font-display); }
+.font-mono { font-family: var(--font-mono); }
+.font-body { font-family: var(--font-body); }
+
+.text-xs { font-size: var(--text-xs); }
+.text-sm { font-size: var(--text-sm); }
+.text-base { font-size: var(--text-base); }
+.text-lg { font-size: var(--text-lg); }
+.text-xl { font-size: var(--text-xl); }
+.text-2xl { font-size: var(--text-2xl); }
+.text-3xl { font-size: var(--text-3xl); }
+.text-4xl { font-size: var(--text-4xl); }
+
+/* === Color Utility Classes === */
+.text-primary { color: var(--color-text-primary); }
+.text-secondary { color: var(--color-text-secondary); }
+.text-muted { color: var(--color-text-muted); }
+.text-gold { color: var(--color-text-gold); }
+
+.bg-deep { background-color: var(--color-bg-deep); }
+.bg-panel { background-color: var(--color-bg-panel); }
+.bg-card { background-color: var(--color-bg-card); }
+.bg-elevated { background-color: var(--color-bg-elevated); }
+.bg-hover { background-color: var(--color-bg-hover); }

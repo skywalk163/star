@@ -1,0 +1,35 @@
+# 群星 Star — AI Agent 调度中心
+# 运行依赖
+
+# == Web 框架 ==
+fastapi>=0.110.0
+uvicorn[standard]>=0.29.0
+starlette>=0.37.0
+websockets>=12.0
+
+# == 数据库 ==
+aiosqlite>=0.20.0
+
+# == 配置 ==
+PyYAML>=6.0
+python-dotenv>=1.0.0
+
+# == 日志 ==
+loguru>=0.7.0
+
+# == 系统 ==
+psutil>=5.9.0
+pywin32>=306
+
+# == UI Automation ==
+PyAutoGUI>=0.9.54
+uiautomation>=2.0.0
+
+# == OCR（可选，不安装不影响服务启动） ==
+# paddlepaddle
+# paddleocr
+# opencv-python
+# Pillow
+
+# == 运行 ==
+watchfiles>=0.21.0

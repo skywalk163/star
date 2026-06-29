@@ -1,0 +1,1389 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>星图面板 — 群星 Star</title>
+    <style id="theme-vars">
+/* ============================================
+   群星 Star — Brand Design Tokens
+   Deep Space Theme
+   ============================================ */
+
+:root {
+  /* === Primary Palette === */
+  --color-bg-deep: #0a0e27;
+  --color-bg-panel: #1a1f3a;
+  --color-bg-card: #151934;
+  --color-bg-elevated: #212647;
+  --color-bg-hover: #2a3058;
+
+  /* === Accent: Starlight Gold === */
+  --color-primary: #ffd700;
+  --color-primary-dim: rgba(255, 215, 0, 0.15);
+  --color-primary-muted: rgba(255, 215, 0, 0.6);
+  --color-primary-glow: rgba(255, 215, 0, 0.25);
+
+  /* === Star Magnitude Colors === */
+  --color-star-supernova: #ffffff;
+  --color-star-bright: #4fc3f7;
+  --color-star-normal: #b0bec5;
+  --color-star-dim: #616161;
+
+  /* === Star Status Colors === */
+  --color-status-shining: #66bb6a;
+  --color-status-awaiting: #ffa726;
+  --color-status-faded: #ef5350;
+  --color-status-nascent: #ab47bc;
+  --color-status-orbiting: #42a5f5;
+  --color-status-constellated: #ffd700;
+  --color-status-darkened: #455a64;
+
+  /* === Semantic State === */
+  --state-success: #66bb6a;
+  --state-warning: #ffa726;
+  --state-error: #ef5350;
+  --state-info: #42a5f5;
+
+  /* === Text === */
+  --color-text-primary: #e8eaf6;
+  --color-text-secondary: #9fa8da;
+  --color-text-muted: #616885;
+  --color-text-gold: #ffd700;
+
+  /* === Border === */
+  --color-border: rgba(255, 255, 255, 0.08);
+  --color-border-subtle: rgba(255, 255, 255, 0.04);
+  --color-border-glow: rgba(255, 215, 0, 0.2);
+
+  /* === Surface Depth === */
+  --surface-1: #0a0e27;
+  --surface-2: #1a1f3a;
+  --surface-3: #212647;
+  --surface-4: #2a3058;
+
+  /* === Typography === */
+  --font-display: 'Inter', 'Noto Sans SC', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+  --font-body: var(--font-display);
+
+  /* === Font Sizes === */
+  --text-xs: 0.75rem;
+  --text-sm: 0.8125rem;
+  --text-base: 0.875rem;
+  --text-lg: 1rem;
+  --text-xl: 1.125rem;
+  --text-2xl: 1.5rem;
+  --text-3xl: 1.875rem;
+  --text-4xl: 2.25rem;
+
+  /* === Radius === */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-full: 9999px;
+
+  /* === Spacing === */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 12px;
+  --space-lg: 16px;
+  --space-xl: 24px;
+  --space-2xl: 32px;
+  --space-3xl: 48px;
+
+  /* === Shadows (static surfaces: border-first, alpha <= 0.05) === */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.05);
+  /* Floating layers only (modal, drawer, tooltip) */
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.15);
+  --shadow-glow: 0 0 20px rgba(255, 215, 0, 0.15);
+
+  /* === Transitions === */
+  --transition-fast: 150ms ease;
+  --transition-normal: 250ms ease;
+  --transition-slow: 400ms ease;
+}
+
+/* === Typography Classes === */
+.font-display { font-family: var(--font-display); }
+.font-mono { font-family: var(--font-mono); }
+.font-body { font-family: var(--font-body); }
+
+.text-xs { font-size: var(--text-xs); }
+.text-sm { font-size: var(--text-sm); }
+.text-base { font-size: var(--text-base); }
+.text-lg { font-size: var(--text-lg); }
+.text-xl { font-size: var(--text-xl); }
+.text-2xl { font-size: var(--text-2xl); }
+.text-3xl { font-size: var(--text-3xl); }
+.text-4xl { font-size: var(--text-4xl); }
+
+/* === Color Utility Classes === */
+.text-primary { color: var(--color-text-primary); }
+.text-secondary { color: var(--color-text-secondary); }
+.text-muted { color: var(--color-text-muted); }
+.text-gold { color: var(--color-text-gold); }
+
+.bg-deep { background-color: var(--color-bg-deep); }
+.bg-panel { background-color: var(--color-bg-panel); }
+.bg-card { background-color: var(--color-bg-card); }
+.bg-elevated { background-color: var(--color-bg-elevated); }
+.bg-hover { background-color: var(--color-bg-hover); }
+
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.3.1/dist/index.global.js"></script>
+    <script src="https://unpkg.com/lucide@1.8.0/dist/umd/lucide.min.js"></script>
+    <script src="/ui/js/api-bridge.js"></script>
+    <script src="/ui/js/onboarding.js"></script>
+    <script src="/ui/js/nav.js"></script>
+    <style type="text/tailwindcss">
+  @theme inline {
+    --color-primary: var(--color-primary);
+    --color-border: var(--color-border);
+  }
+  @layer base {
+    body { background: var(--color-background); color: var(--color-text-primary); }
+    td, th { @apply break-words; word-break: break-all; word-break: auto-phrase; }
+    th { @apply whitespace-nowrap; }
+  }
+    </style>
+    <style>
+      .no-scrollbar::-webkit-scrollbar { display: none; }
+      .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      [data-icon] {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        -webkit-mask-size: contain;
+        mask-size: contain;
+        -webkit-mask-repeat: no-repeat;
+        mask-repeat: no-repeat;
+        -webkit-mask-position: center;
+        mask-position: center;
+        background-color: currentColor;
+      }
+    </style>
+</head>
+<body class="min-h-screen font-sans antialiased overflow-hidden" style="background:var(--color-bg-deep);color:var(--color-text-primary);font-family:var(--font-body);">
+    <main class="flex h-screen">
+
+      <!-- ===== SIDEBAR ===== -->
+      <aside class="flex flex-col items-center w-[60px] shrink-0 border-r" style="background:var(--color-bg-panel);border-color:var(--color-border);">
+        <!-- Logo -->
+        <div class="flex items-center justify-center w-full h-[56px] border-b" style="border-color:var(--color-border);">
+          <span class="text-2xl font-bold" style="color:#ffd700;">&#9733;</span>
+        </div>
+        <!-- Nav Items -->
+        <nav class="flex flex-col items-center flex-1 pt-3 gap-1">
+          <a href="#" title="Star Map" data-dom-id="nav-starmap"
+             class="relative flex items-center justify-center w-10 h-10 transition-all duration-200"
+             style="background:var(--color-primary-dim);color:#ffd700;border-left:3px solid #ffd700;border-radius:0 8px 8px 0;">
+            <i data-lucide="sparkles" class="w-5 h-5"></i>
+          </a>
+          <a href="#" title="Orbit Console" data-dom-id="nav-orbit"
+             class="relative flex items-center justify-center w-10 h-10 transition-all duration-200"
+             style="color:var(--color-text-muted);border-left:3px solid transparent;">
+            <i data-lucide="orbit" class="w-5 h-5"></i>
+          </a>
+          <a href="/ui/pages/starlight.html" title="Starlight Review" data-dom-id="nav-starlight"
+             class="relative flex items-center justify-center w-10 h-10 transition-all duration-200"
+             style="color:var(--color-text-muted);border-left:3px solid transparent;">
+            <i data-lucide="scan-eye" class="w-5 h-5"></i>
+          </a>
+          <a href="/ui/pages/starfleet.html" title="Star Fleet Status" data-dom-id="nav-starfleet"
+             class="relative flex items-center justify-center w-10 h-10 transition-all duration-200"
+             style="color:var(--color-text-muted);border-left:3px solid transparent;">
+            <i data-lucide="layout-dashboard" class="w-5 h-5"></i>
+          </a>
+          <a href="/remote" title="Remote Control" data-dom-id="nav-remote"
+             class="relative flex items-center justify-center w-10 h-10 transition-all duration-200"
+             style="color:var(--color-text-muted);border-left:3px solid transparent;">
+            <i data-lucide="satellite" class="w-5 h-5"></i>
+          </a>
+        </nav>
+        <!-- Bottom: Settings -->
+        <div class="flex flex-col items-center pb-4 gap-1">
+          <a href="#" title="Settings"
+             class="flex items-center justify-center w-10 h-10 transition-all duration-200"
+             style="color:var(--color-text-muted);">
+            <i data-lucide="settings" class="w-5 h-5"></i>
+          </a>
+        </div>
+      </aside>
+
+      <!-- ===== MAIN AREA ===== -->
+      <div class="flex flex-col flex-1 min-w-0">
+
+        <!-- ===== TOP HEADER BAR ===== -->
+        <header class="flex items-center justify-between shrink-0 px-6 h-[56px] border-b"
+                style="background:var(--color-bg-panel);border-color:var(--color-border);">
+          <!-- Left: Title + Breadcrumb -->
+          <div class="flex items-center gap-3 min-w-0">
+            <h1 class="text-lg font-semibold whitespace-nowrap" style="color:var(--color-text-primary);">星图面板 / Star Map</h1>
+            <span class="text-sm whitespace-nowrap" style="color:var(--color-text-muted);">群星 Star &gt; 星图</span>
+          </div>
+          <!-- Right: Status -->
+          <div class="flex items-center gap-4 shrink-0">
+            <button data-dom-id="btn-create-nova"
+                    class="hidden sm:flex items-center gap-2 px-4 py-1.5 rounded-lg text-sm font-medium cursor-pointer transition-all duration-200 hover:brightness-110"
+                    style="background:var(--color-primary);color:var(--color-bg-deep);">
+              <i data-lucide="plus" class="w-4 h-4"></i>
+              <span>创建新星</span>
+            </button>
+            <div class="relative group flex items-center gap-2 px-3 py-1.5 rounded-lg cursor-default" style="background:var(--color-bg-card);">
+              <span class="w-2 h-2 rounded-full shrink-0" id="status-dot" style="background:var(--color-status-shining);box-shadow:0 0 6px var(--color-status-shining);"></span>
+              <span class="text-sm whitespace-nowrap" id="status-text" style="color:var(--color-text-secondary);">已连接</span>
+              <!-- hover tooltip -->
+              <div class="absolute top-full right-0 mt-2 px-3 py-2 rounded-lg text-xs whitespace-nowrap hidden group-hover:block z-50" style="background:var(--color-bg-elevated);color:var(--color-text-secondary);border:1px solid var(--color-border);">
+                <div>API: http://localhost:8767</div>
+                <div id="ws-status-hover">WebSocket: 已连接</div>
+              </div>
+            </div>
+            <div class="hidden sm:flex items-center gap-2 text-sm" style="color:var(--color-text-secondary);">
+              <span class="whitespace-nowrap" data-stat="shining" style="color:var(--color-status-shining);">3 闪耀</span>
+              <span style="color:var(--color-text-muted);">/</span>
+              <span class="whitespace-nowrap" data-stat="idle" style="color:var(--color-star-dim);">5 空闲</span>
+            </div>
+          </div>
+        </header>
+
+        <!-- ===== CONTENT BODY (scrollable) ===== -->
+        <div class="flex-1 overflow-y-auto p-4 lg:p-6" style="background:var(--color-bg-deep);">
+
+          <!-- Stats Summary Strip -->
+          <div class="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-4">
+            <!-- Stat 1: 总星体数 + 趋势箭头 -->
+            <div class="stat-card flex items-center gap-3 px-4 py-3 rounded-lg border cursor-default" style="background:var(--color-bg-panel);border-color:var(--color-border);">
+              <div class="flex items-center justify-center w-10 h-10 shrink-0 rounded-lg" style="background:var(--color-primary-dim);">
+                <i data-lucide="star" class="w-5 h-5" style="color:#ffd700;"></i>
+              </div>
+              <div class="min-w-0 flex-1">
+                <div class="flex items-center gap-1.5">
+                  <span class="text-xl font-semibold whitespace-nowrap font-mono stat-total" style="color:var(--color-text-primary);">0</span>
+                  <span class="flex items-center text-xs" style="color:var(--color-status-shining);">
+                    <i data-lucide="trending-up" class="w-3 h-3"></i>
+                  </span>
+                </div>
+                <div class="text-xs whitespace-nowrap truncate" style="color:var(--color-text-muted);">总星体数</div>
+              </div>
+            </div>
+            <!-- Stat 2: 闪耀中 + 闪烁状态点 -->
+            <div class="stat-card flex items-center gap-3 px-4 py-3 rounded-lg border cursor-default" style="background:var(--color-bg-panel);border-color:var(--color-border);">
+              <div class="flex items-center justify-center w-10 h-10 shrink-0 rounded-lg" style="background:rgba(102,187,106,0.12);">
+                <i data-lucide="zap" class="w-5 h-5" style="color:var(--color-status-shining);"></i>
+              </div>
+              <div class="min-w-0 flex-1">
+                <div class="flex items-center gap-1.5">
+                  <span class="text-xl font-semibold whitespace-nowrap font-mono stat-shining" style="color:var(--color-status-shining);">0</span>
+                  <span class="w-2 h-2 rounded-full status-dot-blink" style="background:var(--color-status-shining);box-shadow:0 0 6px var(--color-status-shining);"></span>
+                </div>
+                <div class="text-xs whitespace-nowrap truncate" style="color:var(--color-text-muted);">闪耀中</div>
+              </div>
+            </div>
+            <!-- Stat 3: 空闲 -->
+            <div class="stat-card flex items-center gap-3 px-4 py-3 rounded-lg border cursor-default" style="background:var(--color-bg-panel);border-color:var(--color-border);">
+              <div class="flex items-center justify-center w-10 h-10 shrink-0 rounded-lg" style="background:rgba(97,97,97,0.15);">
+                <i data-lucide="moon" class="w-5 h-5" style="color:var(--color-star-dim);"></i>
+              </div>
+              <div class="min-w-0 flex-1">
+                <span class="text-xl font-semibold whitespace-nowrap font-mono stat-idle" style="color:var(--color-star-dim);">0</span>
+                <div class="text-xs whitespace-nowrap truncate" style="color:var(--color-text-muted);">空闲</div>
+              </div>
+            </div>
+            <!-- Stat 4: 星体类型数 + 类型分布迷你条形 -->
+            <div class="stat-card flex items-center gap-3 px-4 py-3 rounded-lg border cursor-default" style="background:var(--color-bg-panel);border-color:var(--color-border);">
+              <div class="flex items-center justify-center w-10 h-10 shrink-0 rounded-lg" style="background:var(--color-primary-dim);">
+                <i data-lucide="layers" class="w-5 h-5" style="color:#ffd700;"></i>
+              </div>
+              <div class="min-w-0 flex-1">
+                <span class="text-xl font-semibold whitespace-nowrap font-mono stat-types" style="color:var(--color-text-primary);">0</span>
+                <div class="text-xs whitespace-nowrap truncate mb-1" style="color:var(--color-text-muted);">星体类型</div>
+                <div class="flex items-end gap-0.5 h-4" id="type-mini-bars">
+                </div>
+              </div>
+            </div>
+            <!-- Stat 5: 环形状态图 -->
+            <div class="stat-card flex items-center justify-center gap-3 px-4 py-3 rounded-lg border cursor-default" style="background:var(--color-bg-panel);border-color:var(--color-border);">
+              <div class="relative" style="width:120px;height:120px;">
+                <svg viewBox="0 0 120 120" class="w-full h-full -rotate-90">
+                  <circle cx="60" cy="60" r="50" fill="none" stroke="rgba(97,97,97,0.2)" stroke-width="10"/>
+                  <circle id="ring-progress" cx="60" cy="60" r="50" fill="none" stroke="var(--color-status-shining)" stroke-width="10"
+                          stroke-dasharray="0 314" stroke-linecap="round" style="transition:stroke-dasharray 0.6s ease;"/>
+                </svg>
+                <div class="absolute inset-0 flex flex-col items-center justify-center">
+                  <span class="text-2xl font-bold font-mono ring-total" style="color:var(--color-text-primary);">0</span>
+                  <span class="text-xs ring-percent" style="color:var(--color-text-muted);">0%</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Filter Bar -->
+          <div class="flex flex-wrap items-center gap-2 mb-4">
+            <!-- Type dropdown -->
+            <div class="relative">
+              <select id="filter-type" class="appearance-none pl-3 pr-8 py-2 text-sm border rounded-lg cursor-pointer focus:outline-none"
+                      style="background:var(--color-bg-panel);border-color:var(--color-border);color:var(--color-text-secondary);">
+                <option value="">全部类型</option>
+              </select>
+              <i data-lucide="chevron-down" class="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none" style="color:var(--color-text-muted);"></i>
+            </div>
+            <!-- Status pills -->
+            <div class="flex items-center gap-1.5 overflow-x-auto no-scrollbar" id="filter-status">
+              <button data-status="all" class="status-pill shrink-0 px-3 py-1.5 text-sm rounded-lg whitespace-nowrap transition-colors duration-200"
+                      style="background:var(--color-primary-dim);color:#ffd700;">全部</button>
+              <button data-status="shining" class="status-pill shrink-0 px-3 py-1.5 text-sm rounded-lg whitespace-nowrap transition-colors duration-200"
+                      style="background:var(--color-bg-panel);color:var(--color-text-secondary);">闪耀中</button>
+              <button data-status="idle" class="status-pill shrink-0 px-3 py-1.5 text-sm rounded-lg whitespace-nowrap transition-colors duration-200"
+                      style="background:var(--color-bg-panel);color:var(--color-text-secondary);">空闲</button>
+            </div>
+            <!-- Search -->
+            <div class="relative flex-1 min-w-[160px] max-w-xs">
+              <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style="color:var(--color-text-muted);"></i>
+              <input id="filter-search" type="text" placeholder="搜索星体名称或类型..."
+                     class="w-full pl-9 pr-3 py-2 text-sm border rounded-lg focus:outline-none"
+                     style="background:var(--color-bg-panel);border-color:var(--color-border);color:var(--color-text-primary);">
+            </div>
+            <!-- View toggle -->
+            <div class="flex items-center gap-0.5 p-0.5 rounded-lg" style="background:var(--color-bg-panel);border:1px solid var(--color-border);">
+              <button id="view-card" class="view-btn flex items-center justify-center w-8 h-8 rounded-md transition-colors duration-200"
+                      style="background:var(--color-primary-dim);color:#ffd700;" title="卡片视图">
+                <i data-lucide="grid" class="w-4 h-4"></i>
+              </button>
+              <button id="view-list" class="view-btn flex items-center justify-center w-8 h-8 rounded-md transition-colors duration-200"
+                      style="color:var(--color-text-muted);" title="列表视图">
+                <i data-lucide="list" class="w-4 h-4"></i>
+              </button>
+            </div>
+            <!-- Refresh button -->
+            <button id="btn-refresh" class="flex items-center justify-center w-9 h-9 rounded-lg border transition-colors duration-200"
+                    style="background:var(--color-bg-panel);border-color:var(--color-border);color:var(--color-text-secondary);" title="刷新">
+              <i data-lucide="refresh-cw" class="w-4 h-4" id="refresh-icon"></i>
+            </button>
+          </div>
+
+          <!-- Main Grid: Star Field + Details Panel -->
+          <div class="flex flex-col lg:flex-row gap-4">
+
+            <!-- Star Field: Card View -->
+            <div id="star-grid-container" class="flex-1 min-w-0">
+              <!-- Card View -->
+              <div id="card-view" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 auto-rows-min">
+
+                <!-- 骨架屏 -->
+                <div id="skeleton-grid" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 col-span-full" style="display:grid;">
+                  <div class="p-4 rounded-lg border animate-pulse overflow-hidden" style="background:var(--color-bg-card);border-color:var(--color-border);">
+                    <div class="h-1 -mx-4 -mt-4 mb-3" style="background:var(--color-bg-elevated);"></div>
+                    <div class="flex items-start gap-3 mb-3">
+                      <div class="w-10 h-10 rounded-full" style="background:var(--color-bg-elevated);"></div>
+                      <div class="flex-1">
+                        <div class="h-4 w-24 rounded" style="background:var(--color-bg-elevated);"></div>
+                        <div class="h-3 w-16 rounded mt-2" style="background:var(--color-bg-elevated);"></div>
+                      </div>
+                    </div>
+                    <div class="h-3 w-full rounded mb-2" style="background:var(--color-bg-elevated);"></div>
+                    <div class="h-3 w-3/4 rounded mb-3" style="background:var(--color-bg-elevated);"></div>
+                    <div class="flex gap-2">
+                      <div class="flex-1 h-7 rounded-lg" style="background:var(--color-bg-elevated);"></div>
+                      <div class="flex-1 h-7 rounded-lg" style="background:var(--color-bg-elevated);"></div>
+                    </div>
+                  </div>
+                  <div class="p-4 rounded-lg border animate-pulse overflow-hidden" style="background:var(--color-bg-card);border-color:var(--color-border);">
+                    <div class="h-1 -mx-4 -mt-4 mb-3" style="background:var(--color-bg-elevated);"></div>
+                    <div class="flex items-start gap-3 mb-3">
+                      <div class="w-10 h-10 rounded-full" style="background:var(--color-bg-elevated);"></div>
+                      <div class="flex-1">
+                        <div class="h-4 w-24 rounded" style="background:var(--color-bg-elevated);"></div>
+                        <div class="h-3 w-16 rounded mt-2" style="background:var(--color-bg-elevated);"></div>
+                      </div>
+                    </div>
+                    <div class="h-3 w-full rounded mb-2" style="background:var(--color-bg-elevated);"></div>
+                    <div class="h-3 w-3/4 rounded mb-3" style="background:var(--color-bg-elevated);"></div>
+                    <div class="flex gap-2">
+                      <div class="flex-1 h-7 rounded-lg" style="background:var(--color-bg-elevated);"></div>
+                      <div class="flex-1 h-7 rounded-lg" style="background:var(--color-bg-elevated);"></div>
+                    </div>
+                  </div>
+                  <div class="p-4 rounded-lg border animate-pulse overflow-hidden" style="background:var(--color-bg-card);border-color:var(--color-border);">
+                    <div class="h-1 -mx-4 -mt-4 mb-3" style="background:var(--color-bg-elevated);"></div>
+                    <div class="flex items-start gap-3 mb-3">
+                      <div class="w-10 h-10 rounded-full" style="background:var(--color-bg-elevated);"></div>
+                      <div class="flex-1">
+                        <div class="h-4 w-24 rounded" style="background:var(--color-bg-elevated);"></div>
+                        <div class="h-3 w-16 rounded mt-2" style="background:var(--color-bg-elevated);"></div>
+                      </div>
+                    </div>
+                    <div class="h-3 w-full rounded mb-2" style="background:var(--color-bg-elevated);"></div>
+                    <div class="h-3 w-3/4 rounded mb-3" style="background:var(--color-bg-elevated);"></div>
+                    <div class="flex gap-2">
+                      <div class="flex-1 h-7 rounded-lg" style="background:var(--color-bg-elevated);"></div>
+                      <div class="flex-1 h-7 rounded-lg" style="background:var(--color-bg-elevated);"></div>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+
+              <!-- List View (hidden by default) -->
+              <div id="list-view" class="hidden">
+                <div class="rounded-lg border overflow-hidden" style="background:var(--color-bg-panel);border-color:var(--color-border);">
+                  <table class="w-full text-sm">
+                    <thead>
+                      <tr style="background:var(--color-bg-card);">
+                        <th class="text-left px-4 py-2.5 font-medium" style="color:var(--color-text-muted);">星体</th>
+                        <th class="text-left px-4 py-2.5 font-medium" style="color:var(--color-text-muted);">类型</th>
+                        <th class="text-left px-4 py-2.5 font-medium" style="color:var(--color-text-muted);">PID</th>
+                        <th class="text-left px-4 py-2.5 font-medium" style="color:var(--color-text-muted);">状态</th>
+                        <th class="text-right px-4 py-2.5 font-medium" style="color:var(--color-text-muted);">操作</th>
+                      </tr>
+                    </thead>
+                    <tbody id="list-tbody">
+                    </tbody>
+                  </table>
+                  <div id="list-empty" class="hidden py-12 text-center" style="color:var(--color-text-muted);">
+                    <i data-lucide="inbox" class="w-10 h-10 mx-auto mb-2 opacity-50"></i>
+                    <p class="text-sm">暂无星体</p>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Empty state -->
+              <div id="empty-state" class="hidden py-16 text-center" style="color:var(--color-text-muted);">
+                <i data-lucide="stars" class="w-12 h-12 mx-auto mb-3 opacity-40"></i>
+                <p class="text-sm">暂无匹配的星体</p>
+              </div>
+            </div>
+
+            <!-- ===== RIGHT: Detail Panel (hidden by default) ===== -->
+            <aside id="detail-panel" class="hidden w-[420px] shrink-0 border-l overflow-y-auto" style="background:var(--color-bg-panel);border-color:var(--color-border);">
+              <!-- Empty state -->
+              <div id="detail-empty" class="flex flex-col items-center justify-center h-full text-center px-6" style="color:var(--color-text-muted);">
+                <i data-lucide="mouse-pointer-click" class="w-12 h-12 mb-3" style="color:var(--color-text-muted);"></i>
+                <p class="text-sm">选择一个星体查看详情</p>
+              </div>
+              <!-- Panel content (hidden by default) -->
+              <div id="detail-content" class="hidden flex flex-col h-full">
+                <!-- Tab Bar -->
+                <div class="flex border-b shrink-0" style="border-color:var(--color-border);">
+                  <button class="detail-tab flex-1 py-3 text-sm font-medium text-center transition-colors duration-200" data-tab="info" style="color:#ffd700;border-bottom:2px solid #ffd700;">信息</button>
+                  <button class="detail-tab flex-1 py-3 text-sm font-medium text-center transition-colors duration-200" data-tab="command" style="color:var(--color-text-muted);border-bottom:2px solid transparent;">指令</button>
+                  <button class="detail-tab flex-1 py-3 text-sm font-medium text-center transition-colors duration-200" data-tab="logs" style="color:var(--color-text-muted);border-bottom:2px solid transparent;">日志</button>
+                  <button class="detail-tab flex-1 py-3 text-sm font-medium text-center transition-colors duration-200" data-tab="history" style="color:var(--color-text-muted);border-bottom:2px solid transparent;">历史</button>
+                </div>
+                <!-- Tab Content -->
+                <div class="flex-1 overflow-y-auto p-4" id="detail-tab-content">
+                  <!-- Content will be rendered by JS -->
+                </div>
+              </div>
+            </aside>
+
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- ===== STAR FIELD PARTICLE DECORATION (CSS pseudo-elements) ===== -->
+    <div class="pointer-events-none fixed inset-0 z-0 star-field-overlay" aria-hidden="true"></div>
+
+    <!-- ===== PAGE-SPECIFIC STYLES ===== -->
+    <style>
+      /* Star-field particle decoration via pseudo-elements */
+      .star-field-overlay::before,
+      .star-field-overlay::after {
+        content: '';
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        border-radius: 50%;
+        background: transparent;
+        box-shadow:
+          120px 40px 0 0 rgba(255,255,255,0.15),
+          340px 80px 0 0 rgba(255,255,255,0.1),
+          560px 20px 0 0 rgba(255,255,255,0.2),
+          780px 120px 0 0 rgba(255,255,255,0.08),
+          920px 60px 0 0 rgba(255,255,255,0.12),
+          1100px 140px 0 0 rgba(255,255,255,0.06),
+          250px 200px 0 0 rgba(255,255,255,0.1),
+          450px 260px 0 0 rgba(255,255,255,0.14),
+          650px 180px 0 0 rgba(255,255,255,0.07),
+          850px 300px 0 0 rgba(255,255,255,0.16),
+          1050px 240px 0 0 rgba(255,255,255,0.09),
+          180px 340px 0 0 rgba(255,255,255,0.11),
+          380px 400px 0 0 rgba(255,255,255,0.06),
+          580px 360px 0 0 rgba(255,255,255,0.18),
+          750px 420px 0 0 rgba(255,255,255,0.08),
+          950px 380px 0 0 rgba(255,255,255,0.13),
+          1150px 440px 0 0 rgba(255,255,255,0.05),
+          200px 500px 0 0 rgba(255,255,255,0.1),
+          400px 540px 0 0 rgba(255,255,255,0.15),
+          700px 520px 0 0 rgba(255,255,255,0.07),
+          1000px 560px 0 0 rgba(255,255,255,0.11),
+          300px 600px 0 0 rgba(255,255,255,0.09),
+          500px 640px 0 0 rgba(255,255,255,0.14),
+          800px 680px 0 0 rgba(255,255,255,0.06);
+      }
+      .star-field-overlay::after {
+        box-shadow:
+          80px 100px 0 0 rgba(255,215,0,0.06),
+          260px 160px 0 0 rgba(255,215,0,0.04),
+          430px 90px 0 0 rgba(255,215,0,0.08),
+          610px 220px 0 0 rgba(255,215,0,0.03),
+          820px 150px 0 0 rgba(255,215,0,0.06),
+          1000px 310px 0 0 rgba(255,215,0,0.04),
+          150px 450px 0 0 rgba(255,215,0,0.05),
+          350px 510px 0 0 rgba(255,215,0,0.07),
+          550px 470px 0 0 rgba(255,215,0,0.03),
+          750px 560px 0 0 rgba(255,215,0,0.06);
+      }
+
+      /* Pulsing glow for shining star cards */
+      .star-card-shining {
+        animation: star-pulse 3s ease-in-out infinite;
+      }
+      @keyframes star-pulse {
+        0%, 100% { box-shadow: 0 0 16px rgba(255,215,0,0.08); border-color: rgba(255,215,0,0.2); }
+        50% { box-shadow: 0 0 24px rgba(255,215,0,0.15); border-color: rgba(255,215,0,0.35); }
+      }
+
+      /* Stat card hover lift */
+      .stat-card {
+        transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+      }
+      .stat-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        border-color: var(--color-border-glow) !important;
+      }
+
+      /* Blinking status dot */
+      .status-dot-blink {
+        animation: status-blink 1.5s ease-in-out infinite;
+      }
+      @keyframes status-blink {
+        0%, 100% { opacity: 1; box-shadow: 0 0 6px var(--color-status-shining); }
+        50% { opacity: 0.5; box-shadow: 0 0 2px var(--color-status-shining); }
+      }
+
+      /* Star card top color bar + hover glow */
+      .star-card {
+        position: relative;
+        overflow: hidden;
+        transition: transform 0.2s ease, box-shadow 0.3s ease, border-color 0.2s ease;
+      }
+      .star-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 3px;
+        background: var(--card-bar-color, var(--color-star-dim));
+      }
+      .star-card.shining::before {
+        background: linear-gradient(90deg, #ffd700, #ffed4e, #ffd700);
+      }
+      .star-card:hover {
+        transform: translateY(-2px);
+      }
+      .star-card.shining:hover {
+        box-shadow: 0 0 30px rgba(255,215,0,0.2), 0 4px 20px rgba(0,0,0,0.2);
+      }
+      .star-card.idle:hover {
+        box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+        border-color: var(--color-border-glow) !important;
+      }
+
+      /* Golden shimmer effect on hover for shining cards */
+      .star-card.shining::after {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(255,215,0,0.08), transparent);
+        transition: left 0.6s ease;
+        pointer-events: none;
+      }
+      .star-card.shining:hover::after {
+        left: 100%;
+      }
+
+      /* Refresh button spin animation */
+      .spin-icon {
+        animation: spin 0.8s linear;
+      }
+      @keyframes spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+      }
+
+      /* List view row hover */
+      .list-row {
+        transition: background-color 0.15s ease;
+      }
+      .list-row:hover {
+        background-color: var(--color-bg-hover);
+      }
+
+      /* Star card hover elevation */
+      .group:hover {
+        background-color: var(--color-bg-elevated) !important;
+        border-color: var(--color-border-glow) !important;
+      }
+
+      /* Sidebar nav hover */
+      aside nav a:not([style*="background:var(--color-primary-dim)"]):hover {
+        background: var(--color-bg-hover);
+        color: var(--color-text-secondary);
+      }
+
+      /* Filter pill hover */
+      button[style*="background:var(--color-bg-panel)"]:hover {
+        background: var(--color-bg-hover) !important;
+        color: var(--color-text-primary) !important;
+      }
+
+      /* Action button hover */
+      button:hover {
+        opacity: 0.85;
+      }
+
+      /* Skeleton pulse animation */
+      @keyframes skeleton-pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.4; }
+      }
+      .animate-pulse {
+        animation: skeleton-pulse 1.5s ease-in-out infinite;
+      }
+
+      /* Responsive: hide details panel on small screens */
+      @media (max-width: 1023px) {
+        .star-field-overlay::before,
+        .star-field-overlay::after { display: none; }
+      }
+    </style>
+
+    <script>lucide.createIcons();</script>
+
+    <script>
+    // ===== 全局状态 =====
+    let allStars = [];
+    let currentView = 'card';
+    let filterStatus = 'all';
+    let filterType = '';
+    let searchQuery = '';
+    let searchDebounceTimer = null;
+    const starColors = ['#1e88e5,#42a5f5', '#7c4dff,#b388ff', '#d4841e,#f5a623', '#e53935,#ff7043', '#00897b,#26a69a', '#6e7681,#8b949e', '#8e24aa,#ce93d8', '#00acc1,#4dd0e1'];
+
+    function getStarColor(index) {
+      return starColors[index % starColors.length];
+    }
+
+    function truncate(str, maxLen) {
+      if (!str) return '';
+      return str.length > maxLen ? str.slice(0, maxLen) + '…' : str;
+    }
+
+    // ===== 格式化时间 =====
+    function formatStartTime(timestamp) {
+      if (!timestamp) return null;
+      try {
+        const d = new Date(timestamp);
+        const now = new Date();
+        const diffMs = now - d;
+        const diffMins = Math.floor(diffMs / 60000);
+        const diffHours = Math.floor(diffMs / 3600000);
+        if (diffMins < 1) return '刚刚启动';
+        if (diffMins < 60) return diffMins + ' 分钟前';
+        if (diffHours < 24) return diffHours + ' 小时前';
+        return d.toLocaleDateString('zh-CN');
+      } catch(e) { return null; }
+    }
+
+    // ===== 获取筛选后的星体 =====
+    function getFilteredStars() {
+      return allStars.filter(star => {
+        if (filterStatus === 'shining' && !star.is_shining) return false;
+        if (filterStatus === 'idle' && star.is_shining) return false;
+        if (filterType && star.star_type !== filterType) return false;
+        if (searchQuery) {
+          const q = searchQuery.toLowerCase();
+          const title = (star.title || '').toLowerCase();
+          const type = (star.star_type || '').toLowerCase();
+          if (!title.includes(q) && !type.includes(q)) return false;
+        }
+        return true;
+      });
+    }
+
+    // ===== 更新统计数据 =====
+    function updateStats() {
+      const total = allStars.length;
+      const shiningCount = allStars.filter(s => s.is_shining).length;
+      const idleCount = total - shiningCount;
+
+      const typeMap = {};
+      allStars.forEach(s => {
+        const t = s.star_type || 'Unknown';
+        typeMap[t] = (typeMap[t] || 0) + 1;
+      });
+      const typeEntries = Object.entries(typeMap).sort((a, b) => b[1] - a[1]);
+      const typeCount = typeEntries.length;
+
+      const totalEl = document.querySelector('.stat-total');
+      const shiningEl = document.querySelector('.stat-shining');
+      const idleEl = document.querySelector('.stat-idle');
+      const typesEl = document.querySelector('.stat-types');
+      if (totalEl) totalEl.textContent = total;
+      if (shiningEl) shiningEl.textContent = shiningCount;
+      if (idleEl) idleEl.textContent = idleCount;
+      if (typesEl) typesEl.textContent = typeCount;
+
+      const shiningStat = document.querySelectorAll('[data-stat="shining"]');
+      const idleStat = document.querySelectorAll('[data-stat="idle"]');
+      if (shiningStat.length) shiningStat[0].textContent = shiningCount + ' 闪耀';
+      if (idleStat.length) idleStat[0].textContent = idleCount + ' 空闲';
+
+      const ringProgress = document.getElementById('ring-progress');
+      const ringTotal = document.querySelector('.ring-total');
+      const ringPercent = document.querySelector('.ring-percent');
+      if (ringProgress && ringTotal && ringPercent) {
+        const circumference = 2 * Math.PI * 50;
+        const percent = total > 0 ? (shiningCount / total) : 0;
+        const dashLength = percent * circumference;
+        ringProgress.style.strokeDasharray = dashLength + ' ' + circumference;
+        ringTotal.textContent = total;
+        ringPercent.textContent = Math.round(percent * 100) + '%';
+      }
+
+      const barsContainer = document.getElementById('type-mini-bars');
+      if (barsContainer) {
+        const top3 = typeEntries.slice(0, 3);
+        const maxVal = top3.length > 0 ? top3[0][1] : 1;
+        barsContainer.innerHTML = top3.map(([type, count]) => {
+          const heightPct = Math.max(20, (count / maxVal) * 100);
+          return `<div class="flex-1 rounded-sm transition-all duration-300" style="height:${heightPct}%;background:var(--color-primary-muted);" title="${escapeHtml(type)}: ${count}"></div>`;
+        }).join('');
+      }
+    }
+
+    // ===== 更新类型下拉框 =====
+    async function updateTypeDropdown() {
+      let typeEntries = [];
+      
+      try {
+        const typesRes = await starApi.types().catch(() => null);
+        if (typesRes && (typesRes.types || typesRes.data)) {
+          const typeList = typesRes.types || typesRes.data || [];
+          typeEntries = typeList.map(t => {
+            if (typeof t === 'string') return [t, 0];
+            return [t.name || t.type || 'Unknown', t.count || 0];
+          });
+        }
+      } catch(e) {}
+      
+      if (typeEntries.length === 0 || typeEntries.every(([,c]) => c === 0)) {
+        const typeMap = {};
+        allStars.forEach(s => {
+          const t = s.star_type || 'Unknown';
+          typeMap[t] = (typeMap[t] || 0) + 1;
+        });
+        typeEntries = Object.entries(typeMap).sort((a, b) => b[1] - a[1]);
+      } else {
+          const typeMap = {};
+          allStars.forEach(s => {
+            const t = s.star_type || 'Unknown';
+            typeMap[t] = (typeMap[t] || 0) + 1;
+          });
+          typeEntries = typeEntries.map(([name]) => [name, typeMap[name] || 0]);
+          typeEntries.sort((a, b) => b[1] - a[1]);
+        }
+      
+      const select = document.getElementById('filter-type');
+      if (select) {
+        const currentVal = select.value;
+        select.innerHTML = '<option value="">全部类型</option>' +
+          typeEntries.map(([type, count]) => `<option value="${escapeHtml(type)}">${escapeHtml(type)}${count > 0 ? ' (' + count + ')' : ''}</option>`).join('');
+        if (currentVal && typeEntries.some(([t]) => t === currentVal)) {
+          select.value = currentVal;
+        }
+      }
+    }
+
+    // ===== 渲染卡片视图 =====
+    function renderCardView(stars) {
+      const cardView = document.getElementById('card-view');
+      if (!cardView) return;
+
+      const skeleton = document.getElementById('skeleton-grid');
+      if (skeleton) skeleton.style.display = 'none';
+
+      if (stars.length === 0) {
+        cardView.innerHTML = '';
+        return;
+      }
+
+      cardView.innerHTML = stars.map((star, i) => {
+        const initials = (star.title || '?')[0].toUpperCase();
+        const isShining = star.is_shining;
+        const color = getStarColor(allStars.indexOf(star) >= 0 ? allStars.indexOf(star) : i);
+        const winTitle = star.window_title || star.title || '';
+        const startTime = formatStartTime(star.start_time);
+
+        return `
+          <div data-star-pid="${star.pid}" class="star-card ${isShining ? 'shining star-card-shining' : 'idle'} flex flex-col p-4 rounded-lg border cursor-pointer transition-all duration-200"
+               style="background:var(--color-bg-card);border-color:${isShining ? 'rgba(255,215,0,0.2)' : 'var(--color-border)'};${isShining ? 'box-shadow:0 0 16px rgba(255,215,0,0.08);' : ''}">
+            <div class="flex items-start gap-3 mb-3 mt-1">
+              <div class="flex items-center justify-center w-10 h-10 shrink-0 rounded-full text-sm font-bold" style="background:linear-gradient(135deg,${color});color:#fff;">${escapeHtml(initials)}</div>
+              <div class="min-w-0 flex-1">
+                <div class="text-sm font-semibold truncate" style="color:var(--color-text-primary);">${escapeHtml(star.title || star.star_type)}</div>
+                <div class="text-xs font-mono truncate" style="color:var(--color-text-muted);">PID: ${star.pid || '--'}</div>
+              </div>
+              <div class="flex items-center gap-1.5 shrink-0 px-2 py-0.5 rounded-full" style="background:${isShining ? 'rgba(102,187,106,0.12)' : 'rgba(97,97,97,0.12)'};">
+                <span class="w-1.5 h-1.5 rounded-full ${isShining ? 'status-dot-blink' : ''}" style="background:${isShining ? 'var(--color-status-shining)' : 'var(--color-star-dim)'};${isShining ? 'box-shadow:0 0 4px var(--color-status-shining)' : ''}"></span>
+                <span class="text-xs whitespace-nowrap" style="color:${isShining ? 'var(--color-status-shining)' : 'var(--color-star-dim)'};">${isShining ? '闪耀中' : '空闲'}</span>
+              </div>
+            </div>
+            <div class="text-xs mb-1 truncate" style="color:var(--color-text-secondary);">
+              <span style="color:var(--color-text-muted);">类型:</span> ${escapeHtml(star.star_type || 'Unknown')}
+            </div>
+            ${winTitle ? `<div class="text-xs mb-1 truncate" style="color:var(--color-text-secondary);"><span style="color:var(--color-text-muted);">窗口:</span> ${escapeHtml(truncate(winTitle, 20))}</div>` : ''}
+            ${startTime ? `<div class="text-xs mb-3 truncate" style="color:var(--color-text-muted);"><i data-lucide="clock" class="w-3 h-3 inline mr-0.5"></i>${escapeHtml(startTime)}</div>` : '<div class="mb-3"></div>'}
+            <div class="flex items-center gap-2 mt-auto">
+              <button class="btn-detail flex-1 flex items-center justify-center gap-1 px-2 py-1.5 text-xs rounded-lg border transition-colors duration-200 whitespace-nowrap"
+                      style="border-color:var(--color-border);color:var(--color-text-secondary);">
+                <i data-lucide="info" class="w-3 h-3"></i> 查看详情
+              </button>
+              <button class="btn-command flex-1 flex items-center justify-center gap-1 px-2 py-1.5 text-xs rounded-lg border transition-colors duration-200 whitespace-nowrap"
+                      style="border-color:${isShining ? 'rgba(255,215,0,0.3)' : 'var(--color-border)'};color:${isShining ? '#ffd700' : 'var(--color-text-muted)'};">
+                <i data-lucide="send" class="w-3 h-3"></i> 发送指令
+              </button>
+            </div>
+          </div>
+        `;
+      }).join('');
+      lucide.createIcons();
+    }
+
+    // ===== 渲染列表视图 =====
+    function renderListView(stars) {
+      const tbody = document.getElementById('list-tbody');
+      const listEmpty = document.getElementById('list-empty');
+      if (!tbody) return;
+
+      if (stars.length === 0) {
+        tbody.innerHTML = '';
+        if (listEmpty) listEmpty.classList.remove('hidden');
+        return;
+      }
+      if (listEmpty) listEmpty.classList.add('hidden');
+
+      tbody.innerHTML = stars.map((star, i) => {
+        const initials = (star.title || '?')[0].toUpperCase();
+        const isShining = star.is_shining;
+        const color = getStarColor(allStars.indexOf(star) >= 0 ? allStars.indexOf(star) : i);
+
+        return `
+          <tr data-star-pid="${star.pid}" class="list-row border-t cursor-pointer" style="border-color:var(--color-border);">
+            <td class="px-4 py-3">
+              <div class="flex items-center gap-3">
+                <div class="flex items-center justify-center w-8 h-8 shrink-0 rounded-full text-xs font-bold" style="background:linear-gradient(135deg,${color});color:#fff;">${escapeHtml(initials)}</div>
+                <div class="min-w-0">
+                  <div class="text-sm font-medium truncate" style="color:var(--color-text-primary);">${escapeHtml(star.title || star.star_type)}</div>
+                </div>
+              </div>
+            </td>
+            <td class="px-4 py-3 text-xs" style="color:var(--color-text-secondary);">${escapeHtml(star.star_type || '--')}</td>
+            <td class="px-4 py-3 text-xs font-mono" style="color:var(--color-text-muted);">${star.pid || '--'}</td>
+            <td class="px-4 py-3">
+              <div class="flex items-center gap-1.5">
+                <span class="w-1.5 h-1.5 rounded-full ${isShining ? 'status-dot-blink' : ''}" style="background:${isShining ? 'var(--color-status-shining)' : 'var(--color-star-dim)'};${isShining ? 'box-shadow:0 0 4px var(--color-status-shining)' : ''}"></span>
+                <span class="text-xs" style="color:${isShining ? 'var(--color-status-shining)' : 'var(--color-star-dim)'};">${isShining ? '闪耀中' : '空闲'}</span>
+              </div>
+            </td>
+            <td class="px-4 py-3">
+              <div class="flex items-center justify-end gap-1">
+                <button class="btn-detail w-7 h-7 flex items-center justify-center rounded-md border transition-colors duration-200"
+                        style="border-color:var(--color-border);color:var(--color-text-secondary);" title="查看详情">
+                  <i data-lucide="info" class="w-3.5 h-3.5"></i>
+                </button>
+                <button class="btn-command w-7 h-7 flex items-center justify-center rounded-md border transition-colors duration-200"
+                        style="border-color:${isShining ? 'rgba(255,215,0,0.3)' : 'var(--color-border)'};color:${isShining ? '#ffd700' : 'var(--color-text-muted)'};" title="发送指令">
+                  <i data-lucide="send" class="w-3.5 h-3.5"></i>
+                </button>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+      lucide.createIcons();
+    }
+
+    // ===== 渲染星体 =====
+    function renderStars() {
+      const filtered = getFilteredStars();
+      const emptyState = document.getElementById('empty-state');
+      const cardView = document.getElementById('card-view');
+      const listView = document.getElementById('list-view');
+
+      if (filtered.length === 0) {
+        if (emptyState) emptyState.classList.remove('hidden');
+        if (cardView) cardView.innerHTML = '';
+        if (listView) {
+          const tbody = document.getElementById('list-tbody');
+          if (tbody) tbody.innerHTML = '';
+          const listEmpty = document.getElementById('list-empty');
+          if (listEmpty) listEmpty.classList.remove('hidden');
+        }
+      } else {
+        if (emptyState) emptyState.classList.add('hidden');
+        if (currentView === 'card') {
+          renderCardView(filtered);
+        } else {
+          renderListView(filtered);
+        }
+      }
+    }
+
+    // ===== 切换视图 =====
+    function switchView(view) {
+      currentView = view;
+      const cardView = document.getElementById('card-view');
+      const listView = document.getElementById('list-view');
+      const btnCard = document.getElementById('view-card');
+      const btnList = document.getElementById('view-list');
+
+      if (view === 'card') {
+        if (cardView) cardView.classList.remove('hidden');
+        if (listView) listView.classList.add('hidden');
+        if (btnCard) {
+          btnCard.style.background = 'var(--color-primary-dim)';
+          btnCard.style.color = '#ffd700';
+        }
+        if (btnList) {
+          btnList.style.background = 'transparent';
+          btnList.style.color = 'var(--color-text-muted)';
+        }
+      } else {
+        if (cardView) cardView.classList.add('hidden');
+        if (listView) listView.classList.remove('hidden');
+        if (btnCard) {
+          btnCard.style.background = 'transparent';
+          btnCard.style.color = 'var(--color-text-muted)';
+        }
+        if (btnList) {
+          btnList.style.background = 'var(--color-primary-dim)';
+          btnList.style.color = '#ffd700';
+        }
+      }
+      renderStars();
+    }
+
+    // ===== 设置状态筛选 =====
+    function setStatusFilter(status) {
+      filterStatus = status;
+      document.querySelectorAll('.status-pill').forEach(btn => {
+        const isActive = btn.dataset.status === status;
+        btn.style.background = isActive ? 'var(--color-primary-dim)' : 'var(--color-bg-panel)';
+        btn.style.color = isActive ? '#ffd700' : 'var(--color-text-secondary)';
+      });
+      renderStars();
+    }
+
+    // ===== 防抖搜索 =====
+    function handleSearchInput(value) {
+      clearTimeout(searchDebounceTimer);
+      searchDebounceTimer = setTimeout(() => {
+        searchQuery = value.trim();
+        renderStars();
+      }, 300);
+    }
+
+    // ===== 刷新按钮动画 =====
+    function triggerRefreshSpin() {
+      const icon = document.getElementById('refresh-icon');
+      if (icon) {
+        icon.classList.remove('spin-icon');
+        void icon.offsetWidth;
+        icon.classList.add('spin-icon');
+      }
+    }
+
+    // ===== 加载星体数据 =====
+    async function loadStarMapData() {
+      triggerRefreshSpin();
+      try {
+        const starsRes = await starApi.list().catch(() => ({ stars: [] }));
+        allStars = starsRes.stars || [];
+
+        updateStats();
+        await updateTypeDropdown();
+        renderStars();
+      } catch(e) {
+        console.warn('StarMap API load failed:', e);
+      }
+    }
+    
+    // 添加导航链接
+    addNavListeners();
+    
+    // 更新连接状态指示器
+    connectWebSocket({
+      onConnected: () => {
+        const dot = document.getElementById('status-dot');
+        const txt = document.getElementById('status-text');
+        const wsHover = document.getElementById('ws-status-hover');
+        if (dot) { dot.style.background = 'var(--color-status-shining)'; dot.style.boxShadow = '0 0 6px var(--color-status-shining)'; }
+        if (txt) txt.textContent = '已连接';
+        if (wsHover) wsHover.textContent = 'WebSocket: 已连接';
+      },
+      onClose: () => {
+        const dot = document.getElementById('status-dot');
+        const txt = document.getElementById('status-text');
+        const wsHover = document.getElementById('ws-status-hover');
+        if (dot) { dot.style.background = 'var(--color-status-faded)'; dot.style.boxShadow = 'none'; }
+        if (txt) txt.textContent = '重新连接中…';
+        if (wsHover) wsHover.textContent = 'WebSocket: 已断开，5秒后重连';
+      },
+      onStarsUpdated: () => {
+        loadStarMapData();
+      }
+    });
+    
+    // ===== 详情面板控制 =====
+    let currentTab = 'info';
+    let selectedStar = null;
+    
+    function showDetailPanel(star) {
+      selectedStar = star;
+      appState.setSelectedStar(star);
+      document.getElementById('detail-empty').classList.add('hidden');
+      document.getElementById('detail-content').classList.remove('hidden');
+      document.getElementById('detail-panel').classList.remove('hidden');
+      switchTab('info');
+      renderDetailTab('info', star);
+    }
+    
+    function switchTab(tab) {
+      currentTab = tab;
+      document.querySelectorAll('.detail-tab').forEach(btn => {
+        const isActive = btn.dataset.tab === tab;
+        btn.style.color = isActive ? '#ffd700' : 'var(--color-text-muted)';
+        btn.style.borderBottom = isActive ? '2px solid #ffd700' : '2px solid transparent';
+      });
+    }
+    
+    // 事件委托：点击星体卡片
+    document.getElementById('star-grid-container').addEventListener('click', function(e) {
+      const card = e.target.closest('[data-star-pid]');
+      if (card) {
+        const pid = card.dataset.starPid;
+        const isDetailBtn = e.target.closest('.btn-detail');
+        const isCommandBtn = e.target.closest('.btn-command');
+
+        if (isCommandBtn) {
+          const star = allStars.find(s => String(s.pid) === pid);
+          if (star) {
+            showDetailPanel(star);
+            setTimeout(() => {
+              switchTab('command');
+              renderDetailTab('command', star);
+            }, 100);
+          }
+          return;
+        }
+
+        const star = allStars.find(s => String(s.pid) === pid);
+        if (star) {
+          showDetailPanel(star);
+        } else {
+          starApi.list().then(res => {
+            const s = (res.stars || []).find(x => String(x.pid) === pid);
+            if (s) showDetailPanel(s);
+          }).catch(() => showNotification('获取星体信息失败', 'error'));
+        }
+      }
+    });
+
+    // 状态筛选按钮
+    document.getElementById('filter-status').addEventListener('click', function(e) {
+      const btn = e.target.closest('.status-pill');
+      if (btn) {
+        setStatusFilter(btn.dataset.status);
+      }
+    });
+
+    // 类型筛选
+    document.getElementById('filter-type').addEventListener('change', function(e) {
+      filterType = e.target.value;
+      renderStars();
+    });
+
+    // 搜索框
+    document.getElementById('filter-search').addEventListener('input', function(e) {
+      handleSearchInput(e.target.value);
+    });
+
+    // 视图切换
+    document.getElementById('view-card').addEventListener('click', function() {
+      switchView('card');
+    });
+    document.getElementById('view-list').addEventListener('click', function() {
+      switchView('list');
+    });
+
+    // 刷新按钮
+    document.getElementById('btn-refresh').addEventListener('click', function() {
+      loadStarMapData();
+    });
+    
+    // Tab 切换
+    document.getElementById('detail-panel').addEventListener('click', function(e) {
+      const tabBtn = e.target.closest('.detail-tab');
+      if (tabBtn && selectedStar) {
+        switchTab(tabBtn.dataset.tab);
+        renderDetailTab(tabBtn.dataset.tab, selectedStar);
+      }
+    });
+    
+    // ===== 详情面板 Tab 渲染 =====
+    async function renderDetailTab(tab, star) {
+      const container = document.getElementById('detail-tab-content');
+      container.innerHTML = '<div class="flex items-center justify-center py-8" style="color:var(--color-text-muted);"><i data-lucide="loader" class="w-5 h-5 animate-spin mr-2"></i>加载中…</div>';
+      lucide.createIcons();
+      
+      try {
+        if (tab === 'info') {
+          // 信息 Tab — 显示星体状态 + 响应来源 + 日志统计
+          const [statusRes, logsRes] = await Promise.all([
+            emissaryApi.status(star.pid).catch(() => ({})),
+            emissaryApi.logs(star.pid).catch(() => ({ count: 0, files: [] })),
+          ]);
+          
+          const status = statusRes.status || 'unknown';
+          const responseSource = statusRes.last_turn?.response_source || '--';
+          const logCount = logsRes.count || 0;
+          const logFiles = logsRes.files || [];
+          const lastLogTime = logFiles.length > 0 ? (logFiles[0].modified || '').slice(0, 16).replace('T', ' ') : '--';
+          
+          container.innerHTML = `
+            <div class="space-y-4">
+              <div class="flex items-start gap-3">
+                <div class="flex items-center justify-center w-12 h-12 shrink-0 rounded-full text-lg font-bold" style="background:linear-gradient(135deg,#1e88e5,#42a5f5);color:#fff;">${escapeHtml((star.title || '?')[0].toUpperCase())}</div>
+                <div class="min-w-0 flex-1">
+                  <div class="text-base font-semibold truncate" style="color:var(--color-text-primary);">${escapeHtml(star.title || '')}</div>
+                  <div class="text-xs font-mono mt-0.5" style="color:var(--color-text-muted);">PID: ${star.pid}  ·  类型: ${escapeHtml(star.star_type || '--')}</div>
+                </div>
+              </div>
+              <div class="grid grid-cols-2 gap-3">
+                <div class="px-3 py-2 rounded-lg" style="background:var(--color-bg-card);">
+                  <div class="text-xs" style="color:var(--color-text-muted);">状态</div>
+                  <div class="text-sm font-semibold mt-0.5" style="color:${status === 'idle' ? 'var(--color-star-dim)' : 'var(--color-status-shining)'};">${escapeHtml(status)}</div>
+                </div>
+                <div class="px-3 py-2 rounded-lg" style="background:var(--color-bg-card);">
+                  <div class="text-xs" style="color:var(--color-text-muted);">响应来源</div>
+                  <div class="text-sm font-semibold mt-0.5" style="color:var(--color-text-primary);">${responseSource === 'log' ? '⚡ 日志' : (responseSource === 'ocr' ? '📷 OCR' : '--')}</div>
+                </div>
+              </div>
+              <div class="px-3 py-2 rounded-lg" style="background:var(--color-bg-card);">
+                <div class="text-xs" style="color:var(--color-text-muted);">日志文件</div>
+                <div class="text-sm font-semibold mt-0.5" style="color:var(--color-text-primary);">${logCount} 个文件</div>
+                ${lastLogTime !== '--' ? '<div class="text-xs mt-0.5" style="color:var(--color-text-muted);">最近更新: ' + escapeHtml(lastLogTime) + '</div>' : ''}
+              </div>
+              <button class="w-full py-2 text-sm rounded-lg border transition-colors duration-200 cursor-pointer" style="border-color:var(--color-border);color:var(--color-text-secondary);" onclick="switchTab('logs');renderDetailTab('logs', selectedStar);">
+                <i data-lucide="file-text" class="w-4 h-4 inline mr-1"></i>查看日志
+              </button>
+            </div>
+          `;
+        } else if (tab === 'command') {
+          // 指令 Tab — 发送指令 + 显示响应
+          container.innerHTML = `
+            <div class="space-y-4">
+              <div>
+                <label class="text-xs mb-1 block" style="color:var(--color-text-muted);">适配器</label>
+                <select id="cmd-adapter" class="w-full px-3 py-2 text-sm border rounded-lg focus:outline-none" style="background:var(--color-bg-card);border-color:var(--color-border);color:var(--color-text-primary);">
+                  <option value="">默认</option>
+                </select>
+              </div>
+              <div>
+                <label class="text-xs mb-1 block" style="color:var(--color-text-muted);">指令内容</label>
+                <textarea id="cmd-input" rows="3" class="w-full px-3 py-2 text-sm border rounded-lg focus:outline-none resize-none" style="background:var(--color-bg-card);border-color:var(--color-border);color:var(--color-text-primary);" placeholder="输入发送给星体的指令…"></textarea>
+              </div>
+              <div class="flex gap-2">
+                <button id="btn-send-fast" class="flex-1 flex items-center justify-center gap-1.5 py-2 text-sm font-medium rounded-lg cursor-pointer transition-all duration-200 hover:brightness-110" style="background:var(--color-primary);color:var(--color-bg-deep);">
+                  <i data-lucide="zap" class="w-4 h-4"></i>⚡ 发送
+                </button>
+                <button id="btn-send-ocr" class="flex-1 flex items-center justify-center gap-1.5 py-2 text-sm font-medium rounded-lg border cursor-pointer transition-all duration-200" style="border-color:var(--color-border);color:var(--color-text-secondary);">
+                  <i data-lucide="camera" class="w-4 h-4"></i>📷 OCR 发送
+                </button>
+              </div>
+              <div id="cmd-response" class="hidden">
+                <hr style="border-color:var(--color-border);">
+                <div class="mt-3">
+                  <div class="text-xs mb-1" style="color:var(--color-text-muted);">响应结果</div>
+                  <div id="cmd-response-text" class="px-3 py-2 text-sm rounded-lg whitespace-pre-wrap" style="background:var(--color-bg-card);color:var(--color-text-primary);min-height:40px;"></div>
+                  <div id="cmd-response-meta" class="flex items-center gap-3 mt-2 text-xs" style="color:var(--color-text-muted);"></div>
+                  <button id="btn-copy-response" class="mt-2 px-3 py-1 text-xs rounded-lg border cursor-pointer transition-colors duration-200" style="border-color:var(--color-border);color:var(--color-text-secondary);">复制响应</button>
+                </div>
+              </div>
+            </div>
+          `;
+          lucide.createIcons();
+          
+          // 加载适配器
+          emissaryApi.adapters().then(res => {
+            const sel = document.getElementById('cmd-adapter');
+            (res.adapters || []).forEach(a => {
+              const opt = document.createElement('option');
+              opt.value = a.name; opt.textContent = a.name;
+              sel.appendChild(opt);
+            });
+          }).catch(() => {});
+          
+          // 绑定 ⚡发送 按钮
+          document.getElementById('btn-send-fast').onclick = async () => {
+            const prompt = document.getElementById('cmd-input').value.trim();
+            if (!prompt) return showNotification('请输入指令内容', 'warning');
+            const btn = document.getElementById('btn-send-fast');
+            btn.disabled = true; btn.innerHTML = '<i data-lucide="loader" class="w-4 h-4 animate-spin"></i> 发送中…';
+            lucide.createIcons();
+            try {
+              const adapter = document.getElementById('cmd-adapter').value || undefined;
+              const res = await emissaryApi.ask(star.pid, prompt, adapter);
+              _showCmdResponse(res.response || '(无响应)', res.duration || 0, '⚡');
+            } catch(e) {
+              _showCmdResponse('错误: ' + e.message, 0, '!');
+              showNotification('指令发送失败', 'error');
+            }
+            btn.disabled = false; btn.innerHTML = '<i data-lucide="zap" class="w-4 h-4"></i>⚡ 发送';
+            lucide.createIcons();
+          };
+          
+          // 绑定 📷OCR发送 按钮
+          document.getElementById('btn-send-ocr').onclick = async () => {
+            const prompt = document.getElementById('cmd-input').value.trim();
+            if (!prompt) return showNotification('请输入指令内容', 'warning');
+            const btn = document.getElementById('btn-send-ocr');
+            btn.disabled = true; btn.innerHTML = '<i data-lucide="loader" class="w-4 h-4 animate-spin"></i> OCR 发送中…';
+            lucide.createIcons();
+            try {
+              const adapter = document.getElementById('cmd-adapter').value || undefined;
+              await emissaryApi.send(star.pid, prompt, adapter);
+              const startTime = Date.now();
+              while (Date.now() - startTime < 120000) {
+                await new Promise(r => setTimeout(r, 2000));
+                const resp = await emissaryApi.response(star.pid);
+                if (resp.response) {
+                  _showCmdResponse(resp.response, (Date.now() - startTime) / 1000, '📷');
+                  if (resp.status !== 'waiting' && resp.status !== 'sending') break;
+                }
+              }
+            } catch(e) {
+              showNotification('OCR 发送失败: ' + e.message, 'error');
+            }
+            btn.disabled = false; btn.innerHTML = '<i data-lucide="camera" class="w-4 h-4"></i>📷 OCR 发送';
+            lucide.createIcons();
+          };
+        } else if (tab === 'logs') {
+          // 日志 Tab — 显示日志文件列表 + AI 响应解析结果
+          container.innerHTML = '<div class="flex items-center justify-center py-8" style="color:var(--color-text-muted);"><i data-lucide="loader" class="w-5 h-5 animate-spin mr-2"></i>读取日志中…</div>';
+          lucide.createIcons();
+          
+          try {
+            const [logsRes, recentRes] = await Promise.all([
+              emissaryApi.logs(star.pid).catch(() => ({ count: 0, files: [] })),
+              emissaryApi.logRecent(star.pid, 30).catch(() => ({})),
+            ]);
+            
+            const logCount = logsRes.count || 0;
+            const elapsed = recentRes.elapsed_ms || 0;
+            const aiResponses = recentRes.ai_responses || [];
+            const rawLines = recentRes.raw_lines || [];
+            const files = logsRes.files || [];
+            
+            let html = '<div class="space-y-3">';
+            html += '<div class="flex items-center justify-between"><div class="text-sm font-medium" style="color:var(--color-text-primary);">日志文件: ' + logCount + ' 个</div><div class="text-xs" style="color:var(--color-text-muted);">读取耗时: ' + elapsed + 'ms</div></div>';
+            
+            // AI 响应解析区
+            html += '<div class="px-3 py-2 rounded-lg" style="background:var(--color-bg-card);"><div class="text-xs mb-1" style="color:var(--color-text-muted);">AI 响应解析</div>';
+            if (aiResponses.length > 0) {
+              aiResponses.forEach(r => { html += '<div class="text-sm py-1" style="color:var(--color-text-primary);word-break:break-all;">' + escapeHtml(r) + '</div>'; });
+            } else {
+              html += '<div class="text-sm" style="color:var(--color-text-muted);">(当前日志中未发现 AI 响应)</div>';
+            }
+            html += '</div>';
+            
+            // 最近日志
+            html += '<div class="px-3 py-2 rounded-lg" style="background:var(--color-bg-card);"><div class="text-xs mb-1" style="color:var(--color-text-muted);">最近日志 (' + rawLines.length + ' 行)</div><div class="max-h-[300px] overflow-y-auto font-mono text-xs leading-relaxed" style="color:var(--color-text-secondary);">';
+            rawLines.slice(0, 40).forEach(line => { html += '<div class="truncate hover:text-clip">' + escapeHtml(line) + '</div>'; });
+            html += '</div></div>';
+            
+            // 文件列表切换
+            if (files.length > 0) {
+              html += '<button class="w-full py-2 text-xs rounded-lg border transition-colors duration-200 cursor-pointer" style="border-color:var(--color-border);color:var(--color-text-secondary);" onclick="var el=document.getElementById(\'log-file-list\');if(el)el.classList.toggle(\'hidden\');"><i data-lucide="list" class="w-3 h-3 inline mr-1"></i>显示全部日志文件列表</button>';
+              html += '<div id="log-file-list" class="hidden space-y-1 max-h-[200px] overflow-y-auto px-1">';
+              files.slice(0, 50).forEach(f => { html += '<div class="text-xs py-1 px-2 rounded truncate" style="color:var(--color-text-muted);background:var(--color-bg-card);">' + escapeHtml(f.path) + ' <span class="opacity-50">(' + (f.size_kb || 0) + 'KB)</span></div>'; });
+              if (files.length > 50) html += '<div class="text-xs text-center py-1" style="color:var(--color-text-muted);">…还有 ' + (files.length - 50) + ' 个文件</div>';
+              html += '</div>';
+            }
+            
+            html += '<button class="w-full py-2 text-sm rounded-lg border transition-colors duration-200 cursor-pointer mt-2" style="border-color:var(--color-border);color:var(--color-text-secondary);" onclick="renderDetailTab(\'logs\', selectedStar);"><i data-lucide="refresh-cw" class="w-3 h-3 inline mr-1"></i>刷新</button>';
+            html += '</div>';
+            container.innerHTML = html;
+          } catch(e) {
+            container.innerHTML = '<div class="flex items-center justify-center py-8" style="color:var(--state-error);">日志加载失败: ' + escapeHtml(e.message) + '</div>';
+          }
+        } else if (tab === 'history') {
+          // 历史 Tab — 显示对话历史
+          container.innerHTML = '<div class="flex items-center justify-center py-8" style="color:var(--color-text-muted);"><i data-lucide="loader" class="w-5 h-5 animate-spin mr-2"></i>加载中…</div>';
+          lucide.createIcons();
+          
+          try {
+            const res = await emissaryApi.history(star.pid, 20).catch(() => ({ history: [] }));
+            const history = res.history || [];
+            
+            if (history.length === 0) {
+              container.innerHTML = '<div class="flex flex-col items-center justify-center py-12" style="color:var(--color-text-muted);"><i data-lucide="history" class="w-10 h-10 mb-2"></i><p class="text-sm">暂无对话历史</p></div>';
+            } else {
+              let html = '<div class="space-y-2"><div class="text-xs mb-2" style="color:var(--color-text-muted);">共 ' + (res.total || history.length) + ' 条记录</div>';
+              history.forEach((h, idx) => {
+                const statusIcon = h.status === 'completed' ? '✅' : (h.status === 'error' ? '❌' : '⏳');
+                html += '<div class="px-3 py-2 rounded-lg" style="background:var(--color-bg-card);"><div class="flex items-center justify-between mb-1"><span class="text-xs font-mono" style="color:var(--color-text-muted);">#' + (history.length - idx) + '</span><span class="text-xs">' + statusIcon + ' ' + (h.duration ? h.duration.toFixed(1) + 's' : '--') + '</span></div><div class="text-sm truncate" style="color:var(--color-text-primary);">' + escapeHtml(h.prompt) + '</div><div class="text-xs mt-1 truncate" style="color:var(--color-text-secondary);">' + escapeHtml((h.response_preview || '(空)').slice(0, 80)) + '</div></div>';
+              });
+              html += '</div>';
+              container.innerHTML = html;
+            }
+          } catch(e) {
+            container.innerHTML = '<div class="flex items-center justify-center py-8" style="color:var(--state-error);">历史加载失败: ' + escapeHtml(e.message) + '</div>';
+          }
+        }
+        lucide.createIcons();
+      } catch(e) {
+        container.innerHTML = '<div class="flex items-center justify-center py-8" style="color:var(--state-error);">加载失败: ' + escapeHtml(e.message) + '</div>';
+      }
+    }
+    
+    // 辅助函数：显示指令响应结果
+    function _showCmdResponse(text, duration, source) {
+      const respDiv = document.getElementById('cmd-response');
+      const textDiv = document.getElementById('cmd-response-text');
+      const metaDiv = document.getElementById('cmd-response-meta');
+      respDiv.classList.remove('hidden');
+      textDiv.textContent = text || '(空响应)';
+      const sourceLabel = source === '⚡' ? '⚡ 日志' : (source === '📷' ? '📷 OCR' : source);
+      metaDiv.innerHTML = '<span>来源: ' + sourceLabel + '</span><span>耗时: ' + duration.toFixed(1) + 's</span>';
+      document.getElementById('btn-copy-response').onclick = () => {
+        navigator.clipboard.writeText(text).then(() => showNotification('已复制', 'success', 1500)).catch(() => {});
+      };
+      loadStarMapData(); // 刷新星体列表
+    }
+    
+    // 加载数据
+    loadStarMapData();
+    </script>
+</body>
+</html>

@@ -1,0 +1,1181 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>星光遥控台 — 群星 Star</title>
+    <style id="theme-vars">
+:root {
+  --color-bg-deep: #0a0e27;
+  --color-bg-panel: #1a1f3a;
+  --color-bg-card: #151934;
+  --color-bg-elevated: #212647;
+  --color-bg-hover: #2a3058;
+  --color-primary: #ffd700;
+  --color-primary-dim: rgba(255, 215, 0, 0.15);
+  --color-primary-muted: rgba(255, 215, 0, 0.6);
+  --color-primary-glow: rgba(255, 215, 0, 0.25);
+  --color-status-shining: #66bb6a;
+  --color-status-awaiting: #ffa726;
+  --color-status-faded: #ef5350;
+  --color-text-primary: #e8eaf6;
+  --color-text-secondary: #9fa8da;
+  --color-text-muted: #616885;
+  --color-text-gold: #ffd700;
+  --color-border: rgba(255, 255, 255, 0.08);
+  --color-border-glow: rgba(255, 215, 0, 0.2);
+  --font-display: 'Inter', 'Noto Sans SC', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --space-sm: 8px;
+  --space-md: 12px;
+  --space-lg: 16px;
+  --space-xl: 24px;
+}
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.3.1/dist/index.global.js"></script>
+    <script src="https://unpkg.com/lucide@1.8.0/dist/umd/lucide.min.js"></script>
+    <script src="/ui/js/api-bridge.js"></script>
+    <style>
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body {
+        background: var(--color-bg-deep);
+        color: var(--color-text-primary);
+        font-family: var(--font-display);
+        height: 100vh;
+        overflow: hidden;
+      }
+      .no-scrollbar::-webkit-scrollbar { display: none; }
+      .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      [data-icon] {
+        display: inline-flex; align-items: center; justify-content: center;
+        -webkit-mask-size: contain; mask-size: contain;
+        -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
+        -webkit-mask-position: center; mask-position: center;
+        background-color: currentColor;
+      }
+
+      .app { display: flex; height: 100vh; }
+
+      .sidebar {
+        width: 280px; flex-shrink: 0;
+        background: var(--color-bg-panel);
+        border-right: 1px solid var(--color-border);
+        display: flex; flex-direction: column;
+      }
+      .sidebar-header {
+        padding: var(--space-lg);
+        border-bottom: 1px solid var(--color-border);
+      }
+      .sidebar-title {
+        font-size: 16px; font-weight: 600;
+        color: var(--color-text-primary);
+        display: flex; align-items: center; gap: 8px;
+      }
+      .sidebar-title .icon { color: var(--color-primary); }
+      .sidebar-subtitle {
+        font-size: 12px; color: var(--color-text-muted);
+        margin-top: 4px;
+      }
+      .sidebar-list {
+        flex: 1; overflow-y: auto;
+        padding: var(--space-sm);
+      }
+      .star-group { margin-bottom: 8px; }
+      .star-header {
+        display: flex; align-items: center; gap: 8px;
+        padding: 8px 10px;
+        border-radius: var(--radius-md);
+        cursor: pointer;
+        transition: background 0.2s;
+      }
+      .star-header:hover { background: var(--color-bg-hover); }
+      .star-header.active { background: var(--color-primary-dim); }
+      .star-dot {
+        width: 8px; height: 8px; border-radius: 50%;
+        background: var(--color-status-shining);
+      }
+      .star-name {
+        flex: 1; font-size: 13px; font-weight: 500;
+        color: var(--color-text-primary);
+      }
+      .star-pid {
+        font-size: 11px; color: var(--color-text-muted);
+        font-family: var(--font-mono);
+      }
+      .window-list {
+        margin-left: 20px; margin-top: 4px;
+        display: flex; flex-direction: column; gap: 2px;
+      }
+      .window-item {
+        padding: 6px 10px;
+        font-size: 12px;
+        color: var(--color-text-secondary);
+        border-radius: 6px;
+        cursor: pointer;
+        display: flex; align-items: center; gap: 8px;
+        transition: background 0.2s;
+      }
+      .window-item:hover { background: var(--color-bg-hover); color: var(--color-text-primary); }
+      .window-item.active { background: var(--color-primary-dim); color: var(--color-text-gold); }
+      .window-item .win-icon { font-size: 10px; opacity: 0.6; }
+
+      .main {
+        flex: 1; display: flex; flex-direction: column;
+        overflow: hidden;
+      }
+      .main-header {
+        padding: var(--space-lg) var(--space-xl);
+        border-bottom: 1px solid var(--color-border);
+        display: flex; align-items: center; justify-content: space-between;
+      }
+      .main-title {
+        font-size: 18px; font-weight: 600;
+        display: flex; align-items: center; gap: 10px;
+      }
+      .main-title .status-dot {
+        width: 8px; height: 8px; border-radius: 50%;
+        background: var(--color-status-shining);
+        box-shadow: 0 0 8px var(--color-status-shining);
+      }
+      .header-actions { display: flex; align-items: center; gap: 10px; }
+      .btn {
+        display: inline-flex; align-items: center; gap: 6px;
+        padding: 8px 14px;
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius-md);
+        background: var(--color-bg-elevated);
+        color: var(--color-text-primary);
+        font-size: 13px;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+      .btn:hover { background: var(--color-bg-hover); border-color: var(--color-border-glow); }
+      .btn-primary {
+        background: var(--color-primary);
+        color: #1a1f3a;
+        border-color: var(--color-primary);
+        font-weight: 500;
+      }
+      .btn-primary:hover { opacity: 0.9; }
+      .btn-accent {
+        background: var(--color-accent, #f59e0b);
+        color: #1a1f3a;
+        border-color: var(--color-accent, #f59e0b);
+        font-weight: 500;
+      }
+      .btn-accent:hover { opacity: 0.85; }
+      .btn-sm { padding: 5px 10px; font-size: 12px; }
+
+      .screenshot-area {
+        flex: 1;
+        display: flex; align-items: center; justify-content: center;
+        padding: var(--space-xl);
+        overflow: auto;
+        position: relative;
+      }
+      .screenshot-container {
+        position: relative;
+        max-width: 100%; max-height: 100%;
+        border-radius: var(--radius-lg);
+        overflow: hidden;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+        border: 1px solid var(--color-border);
+      }
+      .screenshot-img {
+        display: block;
+        max-width: 100%;
+        max-height: calc(100vh - 200px);
+      }
+      .hotspot-overlay {
+        position: absolute; top: 0; left: 0;
+        width: 100%; height: 100%;
+        pointer-events: none;
+      }
+      .hotspot-box {
+        position: absolute;
+        border: 2px dashed var(--color-primary);
+        border-radius: 6px;
+        background: rgba(255, 215, 0, 0.1);
+        cursor: pointer;
+        pointer-events: auto;
+        transition: all 0.2s;
+        display: flex; align-items: flex-start; justify-content: flex-start;
+        padding: 4px 8px;
+      }
+      .hotspot-box:hover {
+        background: rgba(255, 215, 0, 0.25);
+        border-style: solid;
+      }
+      .hotspot-label {
+        font-size: 11px;
+        color: var(--color-primary);
+        background: rgba(10, 14, 39, 0.85);
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-weight: 500;
+      }
+      .auth-status-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 12px;
+        background: var(--color-bg-card);
+        border: 1px solid var(--color-border);
+        border-radius: 20px;
+        font-size: 12px;
+        color: var(--color-text-secondary);
+      }
+      .auth-status-badge.authenticated {
+        color: var(--color-success, #10b981);
+        border-color: var(--color-success, #10b981);
+      }
+      .screenshot-placeholder {
+        color: var(--color-text-muted);
+        text-align: center;
+      }
+      .screenshot-placeholder .icon { font-size: 48px; margin-bottom: 12px; opacity: 0.5; }
+      .screenshot-placeholder p { font-size: 14px; }
+
+      .status-bar {
+        padding: var(--space-md) var(--space-xl);
+        border-top: 1px solid var(--color-border);
+        background: var(--color-bg-card);
+        display: flex; align-items: center; justify-content: space-between;
+        font-size: 12px;
+        color: var(--color-text-secondary);
+      }
+      .status-item { display: flex; align-items: center; gap: 6px; }
+      .status-label { color: var(--color-text-muted); }
+      .status-value { color: var(--color-text-primary); font-family: var(--font-mono); }
+
+      .modal-overlay {
+        position: fixed; inset: 0;
+        background: rgba(0, 0, 0, 0.6);
+        display: none;
+        align-items: center; justify-content: center;
+        z-index: 1000;
+      }
+      .modal-overlay.show { display: flex; }
+      .modal {
+        background: var(--color-bg-panel);
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius-lg);
+        width: 480px; max-width: 90vw;
+        padding: var(--space-xl);
+        box-shadow: 0 16px 48px rgba(0,0,0,0.4);
+      }
+      .modal-header {
+        display: flex; align-items: center; justify-content: space-between;
+        margin-bottom: var(--space-lg);
+      }
+      .modal-title { font-size: 16px; font-weight: 600; }
+      .modal-close {
+        width: 28px; height: 28px;
+        display: flex; align-items: center; justify-content: center;
+        border-radius: 6px; cursor: pointer;
+        color: var(--color-text-muted);
+        transition: all 0.2s;
+      }
+      .modal-close:hover { background: var(--color-bg-hover); color: var(--color-text-primary); }
+      .modal-body { margin-bottom: var(--space-lg); }
+      .modal-hint {
+        font-size: 12px; color: var(--color-text-muted);
+        margin-bottom: 8px;
+      }
+      .modal-textarea {
+        width: 100%;
+        min-height: 120px;
+        padding: 12px;
+        background: var(--color-bg-card);
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius-md);
+        color: var(--color-text-primary);
+        font-size: 13px;
+        font-family: var(--font-body);
+        resize: vertical;
+        outline: none;
+      }
+      .modal-textarea:focus { border-color: var(--color-primary); }
+      .modal-footer {
+        display: flex; justify-content: flex-end; gap: 10px;
+      }
+
+      .loading {
+        display: inline-block;
+        width: 16px; height: 16px;
+        border: 2px solid var(--color-border);
+        border-top-color: var(--color-primary);
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+      }
+      @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+    <div class="app">
+      <aside class="sidebar">
+        <div class="sidebar-header">
+          <div class="sidebar-title">
+            <i data-lucide="monitor-play" class="w-5 h-5 icon"></i>
+            星光遥控台
+          </div>
+          <div class="sidebar-subtitle">远程控制 AI Agent 窗口</div>
+        </div>
+        <div class="sidebar-list no-scrollbar" id="starList">
+          <div style="padding:20px;text-align:center;color:var(--color-text-muted);">
+            <div class="loading" style="margin-bottom:10px;"></div>
+            扫描星体中...
+          </div>
+        </div>
+      </aside>
+
+      <main class="main">
+        <div class="main-header">
+          <div class="main-title" id="mainTitle">
+            <span class="status-dot"></span>
+            <span id="currentWindowName">选择一个窗口开始远程控制</span>
+          </div>
+          <div class="header-actions">
+            <button class="btn btn-sm" id="refreshBtn" onclick="refreshScreenshot()">
+              <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+              强制刷新
+            </button>
+            <button class="btn btn-sm" id="hotspotsBtn" onclick="toggleHotspots()">
+              <i data-lucide="crosshair" class="w-4 h-4"></i>
+              <span id="hotspotLabel">显示热点</span>
+            </button>
+            <button class="btn btn-sm" id="keyboardBtn" onclick="showKeyboardPanel()">
+              <i data-lucide="keyboard" class="w-4 h-4"></i>
+              键盘
+            </button>
+            <button class="btn btn-sm btn-accent" id="calibrateBtn" onclick="calibrateHotspots()" title="OCR 自动识别热点位置">
+              <i data-lucide="scan-eye" class="w-4 h-4"></i>
+              校准
+            </button>
+            <button class="btn btn-sm" id="prevTabBtn" onclick="switchToPrevTab()" title="上一个标签 (Ctrl+Shift+Tab)">
+              <i data-lucide="chevron-left" class="w-4 h-4"></i>
+            </button>
+            <button class="btn btn-sm" id="nextTabBtn" onclick="switchToNextTab()" title="下一个标签 (Ctrl+Tab)">
+              <i data-lucide="chevron-right" class="w-4 h-4"></i>
+            </button>
+            <button class="btn btn-sm" id="authBtn" onclick="showAuthPanel()" title="认证设置">
+              <i data-lucide="shield" class="w-4 h-4"></i>
+            </button>
+            <button class="btn btn-sm" id="helpBtn" onclick="showHelpPanel()" title="使用帮助">
+              <i data-lucide="circle-help" class="w-4 h-4"></i>
+            </button>
+          </div>
+        </div>
+
+        <div class="screenshot-area" id="screenshotArea">
+          <div class="screenshot-placeholder">
+            <i data-lucide="scan-line" class="w-12 h-12"></i>
+            <p>从左侧选择一个窗口以查看截图</p>
+          </div>
+        </div>
+
+        <div class="status-bar" id="statusBar" style="display:none;">
+          <div class="status-item">
+            <span class="status-label">刷新间隔:</span>
+            <span class="status-value" id="intervalValue">-</span>
+          </div>
+          <div class="status-item">
+            <span class="status-label">上次刷新:</span>
+            <span class="status-value" id="lastUpdate">-</span>
+          </div>
+          <div class="status-item">
+            <span class="status-label">无变化次数:</span>
+            <span class="status-value" id="noChangeCount">0</span>
+          </div>
+          <div class="status-item">
+            <span class="status-label">窗口句柄:</span>
+            <span class="status-value" id="hwndValue">-</span>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <div class="modal-overlay" id="sendModal">
+      <div class="modal">
+        <div class="modal-header">
+          <div class="modal-title" id="modalTitle">发送指令</div>
+          <div class="modal-close" onclick="closeModal()">&times;</div>
+        </div>
+        <div class="modal-body">
+          <div class="modal-hint" id="modalHint">将发送到 AI 对话输入框</div>
+          <textarea class="modal-textarea" id="modalTextarea" placeholder="输入指令..."></textarea>
+        </div>
+        <div class="modal-footer">
+          <button class="btn" onclick="closeModal()">取消</button>
+          <button class="btn btn-primary" onclick="sendCommand()">发送</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-overlay" id="keyboardModal">
+      <div class="modal" style="width:560px;">
+        <div class="modal-header">
+          <div class="modal-title">键盘操作</div>
+          <div class="modal-close" onclick="closeKeyboardModal()">&times;</div>
+        </div>
+        <div class="modal-body" style="max-height:60vh;overflow-y:auto;">
+          <div style="margin-bottom:16px;">
+            <div style="font-size:12px;color:var(--color-text-muted);margin-bottom:8px;">快捷热键</div>
+            <div style="display:flex;flex-wrap:wrap;gap:6px;">
+              <button class="btn btn-sm" onclick="sendHotkey('ctrl,a')">Ctrl+A 全选</button>
+              <button class="btn btn-sm" onclick="sendHotkey('ctrl,c')">Ctrl+C 复制</button>
+              <button class="btn btn-sm" onclick="sendHotkey('ctrl,v')">Ctrl+V 粘贴</button>
+              <button class="btn btn-sm" onclick="sendHotkey('ctrl,x')">Ctrl+X 剪切</button>
+              <button class="btn btn-sm" onclick="sendHotkey('ctrl,s')">Ctrl+S 保存</button>
+              <button class="btn btn-sm" onclick="sendHotkey('ctrl,z')">Ctrl+Z 撤销</button>
+              <button class="btn btn-sm" onclick="sendHotkey('ctrl,y')">Ctrl+Y 重做</button>
+              <button class="btn btn-sm" onclick="sendHotkey('tab')">Tab</button>
+              <button class="btn btn-sm" onclick="sendHotkey('escape')">Esc</button>
+            </div>
+          </div>
+          <div style="margin-bottom:16px;">
+            <div style="font-size:12px;color:var(--color-text-muted);margin-bottom:8px;">自定义热键（逗号分隔）</div>
+            <div style="display:flex;gap:8px;">
+              <input type="text" id="customHotkeyInput" placeholder="如: ctrl,shift,s"
+                style="flex:1;padding:8px 12px;background:var(--color-bg-card);border:1px solid var(--color-border);border-radius:6px;color:var(--color-text-primary);font-size:13px;outline:none;">
+              <button class="btn btn-primary btn-sm" onclick="sendCustomHotkey()">发送</button>
+            </div>
+          </div>
+          <div style="margin-bottom:16px;">
+            <div style="font-size:12px;color:var(--color-text-muted);margin-bottom:8px;">直接文本输入（先激活输入框）</div>
+            <div style="display:flex;gap:8px;">
+              <input type="text" id="directTextInput" placeholder="输入文本..."
+                style="flex:1;padding:8px 12px;background:var(--color-bg-card);border:1px solid var(--color-border);border-radius:6px;color:var(--color-text-primary);font-size:13px;outline:none;">
+              <button class="btn btn-primary btn-sm" onclick="sendDirectText()">发送</button>
+            </div>
+          </div>
+          <div>
+            <div style="font-size:12px;color:var(--color-text-muted);margin-bottom:8px;">操作序列（JSON 数组）</div>
+            <div style="display:flex;flex-direction:column;gap:8px;">
+              <textarea id="sequenceInput" rows="3" placeholder='[["ctrl","a"],"delete","hello",["ctrl","v"]]'
+                style="width:100%;padding:8px 12px;background:var(--color-bg-card);border:1px solid var(--color-border);border-radius:6px;color:var(--color-text-primary);font-size:12px;font-family:var(--font-mono);resize:vertical;outline:none;"></textarea>
+              <button class="btn btn-primary btn-sm" onclick="sendSequence()" style="align-self:flex-end;">执行序列</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-overlay" id="authModal">
+      <div class="modal" style="width:480px;">
+        <div class="modal-header">
+          <div class="modal-title">认证设置</div>
+          <div class="modal-close" onclick="closeAuthModal()">&times;</div>
+        </div>
+        <div class="modal-body">
+          <div style="margin-bottom:16px;">
+            <div class="auth-status-badge" id="authStatusBadge">
+              <i data-lucide="shield-off" class="w-4 h-4"></i>
+              <span id="authStatusText">未认证</span>
+            </div>
+          </div>
+          <div style="margin-bottom:12px;">
+            <div style="font-size:12px;color:var(--color-text-muted);margin-bottom:8px;">API Key</div>
+            <input type="password" id="apiKeyInput" placeholder="输入 API Key..."
+              style="width:100%;padding:10px 12px;background:var(--color-bg-card);border:1px solid var(--color-border);border-radius:6px;color:var(--color-text-primary);font-size:13px;outline:none;font-family:var(--font-mono);">
+          </div>
+          <div style="display:flex;gap:8px;margin-bottom:16px;">
+            <button class="btn btn-primary btn-sm" onclick="saveApiKey()" style="flex:1;">保存</button>
+            <button class="btn btn-sm" onclick="clearApiKey()" style="flex:1;">清除</button>
+          </div>
+          <div style="font-size:11px;color:var(--color-text-muted);line-height:1.6;">
+            <div>📌 角色说明：</div>
+            <div>• <b>admin</b> - 完全控制权限（查看 + 操作）</div>
+            <div>• <b>viewer</b> - 只读权限（仅查看截图和状态）</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== 帮助面板 ==================== -->
+    <div class="modal-overlay" id="helpModal">
+      <div class="modal" style="width:560px;max-height:80vh;overflow-y:auto;">
+        <div class="modal-header">
+          <div class="modal-title">使用帮助</div>
+          <div class="modal-close" onclick="closeHelpModal()">&times;</div>
+        </div>
+        <div class="modal-body">
+          <div style="margin-bottom:20px;">
+            <div style="font-size:14px;font-weight:600;color:var(--color-text-gold);margin-bottom:10px;">&#9670; 快速上手</div>
+            <div style="font-size:13px;color:var(--color-text-secondary);line-height:1.8;padding-left:8px;">
+              <div>1. <b>选择窗口</b> — 在左侧星体列表中点击一个窗口</div>
+              <div>2. <b>查看截图</b> — 主区域实时显示窗口画面，自动定时刷新</div>
+              <div>3. <b>点击热点</b> — 显示预设热点区域，点击即可打开指令输入框</div>
+              <div>4. <b>发送指令</b> — 输入内容后自动发送到 AI 对话输入框</div>
+            </div>
+          </div>
+
+          <div style="margin-bottom:20px;">
+            <div style="font-size:14px;font-weight:600;color:var(--color-text-gold);margin-bottom:10px;">&#9670; 快捷键参考</div>
+            <div style="display:grid;grid-template-columns:1fr 2fr;gap:6px 16px;font-size:13px;padding-left:8px;">
+              <div style="font-family:var(--font-mono);background:var(--color-bg-card);padding:4px 8px;border-radius:4px;color:var(--color-text-primary);">Ctrl+Tab</div>
+              <div style="color:var(--color-text-secondary);">切换到下一个标签页</div>
+              <div style="font-family:var(--font-mono);background:var(--color-bg-card);padding:4px 8px;border-radius:4px;color:var(--color-text-primary);">Ctrl+Shift+Tab</div>
+              <div style="color:var(--color-text-secondary);">切换到上一个标签页</div>
+              <div style="font-family:var(--font-mono);background:var(--color-bg-card);padding:4px 8px;border-radius:4px;color:var(--color-text-primary);">Ctrl+Enter</div>
+              <div style="color:var(--color-text-secondary);">发送指令（在指令输入框中）</div>
+              <div style="font-family:var(--font-mono);background:var(--color-bg-card);padding:4px 8px;border-radius:4px;color:var(--color-text-primary);">Esc</div>
+              <div style="color:var(--color-text-secondary);">关闭当前弹窗</div>
+            </div>
+          </div>
+
+          <div style="margin-bottom:20px;">
+            <div style="font-size:14px;font-weight:600;color:var(--color-text-gold);margin-bottom:10px;">&#9670; 功能说明</div>
+            <div style="display:flex;flex-direction:column;gap:10px;padding-left:8px;">
+              <div style="background:var(--color-bg-card);border-radius:8px;padding:10px 14px;">
+                <div style="font-size:13px;font-weight:500;color:var(--color-text-primary);margin-bottom:4px;">
+                  <i data-lucide="crosshair" class="w-4 h-4" style="display:inline;vertical-align:middle;margin-right:4px;"></i> 热点
+                </div>
+                <div style="font-size:12px;color:var(--color-text-muted);">显示预设的 AI 界面操作区域（如输入框、发送按钮），点击即可发送指令。</div>
+              </div>
+              <div style="background:var(--color-bg-card);border-radius:8px;padding:10px 14px;">
+                <div style="font-size:13px;font-weight:500;color:var(--color-text-primary);margin-bottom:4px;">
+                  <i data-lucide="scan-eye" class="w-4 h-4" style="display:inline;vertical-align:middle;margin-right:4px;"></i> 校准
+                </div>
+                <div style="font-size:12px;color:var(--color-text-muted);">通过 OCR 自动识别窗口中的输入框位置，校准热点坐标。适用于布局变化后的重新定位。</div>
+              </div>
+              <div style="background:var(--color-bg-card);border-radius:8px;padding:10px 14px;">
+                <div style="font-size:13px;font-weight:500;color:var(--color-text-primary);margin-bottom:4px;">
+                  <i data-lucide="keyboard" class="w-4 h-4" style="display:inline;vertical-align:middle;margin-right:4px;"></i> 键盘
+                </div>
+                <div style="font-size:12px;color:var(--color-text-muted);">模拟键盘操作：快捷热键、自定义组合键、直接文本输入、操作序列（JSON）。</div>
+              </div>
+              <div style="background:var(--color-bg-card);border-radius:8px;padding:10px 14px;">
+                <div style="font-size:13px;font-weight:500;color:var(--color-text-primary);margin-bottom:4px;">
+                  <i data-lucide="chevron-left" class="w-4 h-4" style="display:inline;vertical-align:middle;margin-right:4px;"></i><i data-lucide="chevron-right" class="w-4 h-4" style="display:inline;vertical-align:middle;margin-right:4px;"></i> 标签切换
+                </div>
+                <div style="font-size:12px;color:var(--color-text-muted);">在 AI 软件的多个标签页之间切换。也可点击截图顶部的标签区域直接切换。</div>
+              </div>
+              <div style="background:var(--color-bg-card);border-radius:8px;padding:10px 14px;">
+                <div style="font-size:13px;font-weight:500;color:var(--color-text-primary);margin-bottom:4px;">
+                  <i data-lucide="shield" class="w-4 h-4" style="display:inline;vertical-align:middle;margin-right:4px;"></i> 认证
+                </div>
+                <div style="font-size:12px;color:var(--color-text-muted);">设置 API Key 以访问受保护的远程控制服务。admin 角色完全控制，viewer 角色只读查看。</div>
+              </div>
+            </div>
+          </div>
+
+          <div style="margin-bottom:8px;">
+            <div style="font-size:14px;font-weight:600;color:var(--color-text-gold);margin-bottom:10px;">&#9670; 热点校准说明</div>
+            <div style="font-size:13px;color:var(--color-text-secondary);line-height:1.8;padding-left:8px;">
+              <div>1. 选择目标窗口，确保输入框在画面中可见</div>
+              <div>2. 点击 <b>校准</b> 按钮启动 OCR 识别</div>
+              <div>3. 系统自动扫描窗口，识别可能的输入框位置</div>
+              <div>4. 校准结果会显示找到的候选数量，热点自动更新</div>
+              <div>5. 校准后点击 <b>显示热点</b> 查看识别结果</div>
+              <div>6. 若不满意，调整窗口布局后重新校准</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      let currentHwnd = null;
+      let currentStar = null;
+      let currentHotspots = {};
+      let showHotspots = false;
+      let refreshTimer = null;
+      let currentHotspotKey = 'input_box';
+
+      function formatInterval(seconds) {
+        if (seconds < 60) return seconds + ' 秒';
+        if (seconds < 3600) return Math.floor(seconds / 60) + ' 分钟';
+        return Math.floor(seconds / 3600) + ' 小时';
+      }
+
+      function formatAgo(timestamp) {
+        if (!timestamp) return '-';
+        const now = Date.now() / 1000;
+        const diff = now - timestamp;
+        if (diff < 60) return '刚刚';
+        if (diff < 3600) return Math.floor(diff / 60) + ' 分钟前';
+        if (diff < 86400) return Math.floor(diff / 3600) + ' 小时前';
+        return Math.floor(diff / 86400) + ' 天前';
+      }
+
+      async function loadStars() {
+        try {
+          const data = await starApi.list();
+          const stars = data.stars || [];
+          renderStarList(stars);
+        } catch (e) {
+          document.getElementById('starList').innerHTML =
+            '<div style="padding:20px;text-align:center;color:var(--color-status-faded);">加载失败</div>';
+        }
+      }
+
+      function renderStarList(stars) {
+        const container = document.getElementById('starList');
+        container.innerHTML = '';
+
+        stars.forEach(star => {
+          const group = document.createElement('div');
+          group.className = 'star-group';
+
+          const header = document.createElement('div');
+          header.className = 'star-header';
+          header.innerHTML =
+            '<span class="star-dot"></span>' +
+            '<span class="star-name">' + escapeHtml(star.star_type.toUpperCase()) + '</span>' +
+            '<span class="star-pid">PID ' + star.pid + '</span>';
+          group.appendChild(header);
+
+          const winList = document.createElement('div');
+          winList.className = 'window-list';
+
+          const windows = star.windows || [];
+          if (windows.length === 0 && star.title) {
+            const item = document.createElement('div');
+            item.className = 'window-item';
+            item.innerHTML = '<span class="win-icon">&#9679;</span>' +
+              '<span class="win-name">' + escapeHtml(star.title || '主窗口') + '</span>';
+            item.onclick = () => selectWindow(star, star.hwnd, star.title || '主窗口');
+            winList.appendChild(item);
+          } else {
+            windows.forEach(win => {
+              const item = document.createElement('div');
+              item.className = 'window-item';
+              item.innerHTML = '<span class="win-icon">&#9679;</span>' +
+                '<span class="win-name">' + escapeHtml(win.title || '窗口 ' + win.hwnd) + '</span>';
+              item.onclick = () => selectWindow(star, win.hwnd, win.title || '窗口');
+              winList.appendChild(item);
+            });
+          }
+
+          group.appendChild(winList);
+          container.appendChild(group);
+        });
+
+        if (stars.length === 0) {
+          container.innerHTML =
+            '<div style="padding:20px;text-align:center;color:var(--color-text-muted);">未发现星体</div>';
+        }
+      }
+
+      async function selectWindow(star, hwnd, title) {
+        currentStar = star;
+        currentHwnd = hwnd;
+
+        document.querySelectorAll('.window-item').forEach(el => el.classList.remove('active'));
+        event.currentTarget.classList.add('active');
+
+        document.getElementById('mainTitle').innerHTML =
+          '<span class="status-dot"></span>' +
+          '<span>' + escapeHtml(title) + '</span>';
+
+        document.getElementById('statusBar').style.display = 'flex';
+        document.getElementById('hwndValue').textContent = hwnd;
+
+        try {
+          currentHotspots = await remoteApi.getHotspots(star.star_type);
+          if (showHotspots) renderHotspots();
+        } catch (e) {
+          currentHotspots = {};
+        }
+
+        loadScreenshot(true);
+      }
+
+      async function loadScreenshot(force = false) {
+        if (!currentHwnd) return;
+
+        const area = document.getElementById('screenshotArea');
+
+        const url = remoteApi.getScreenshotUrl(currentHwnd, force) + '&t=' + Date.now();
+
+        const img = new Image();
+        img.onload = () => {
+          area.innerHTML =
+            '<div class="screenshot-container" id="screenshotContainer">' +
+              '<img class="screenshot-img" id="screenshotImg" src="' + url + '" />' +
+              '<div class="hotspot-overlay" id="hotspotOverlay"></div>' +
+            '</div>';
+          if (showHotspots) renderHotspots();
+          updateStatus();
+          scheduleNextRefresh();
+          setupTabClickHandler();
+        };
+        img.onerror = () => {
+          area.innerHTML =
+            '<div class="screenshot-placeholder">' +
+              '<i data-lucide="alert-triangle" class="w-12 h-12"></i>' +
+              '<p>截图加载失败</p>' +
+            '</div>';
+          lucide.createIcons();
+        };
+        img.src = url;
+      }
+
+      function renderHotspots() {
+        const overlay = document.getElementById('hotspotOverlay');
+        if (!overlay || !currentHotspots || !currentHotspots.hotspots) return;
+
+        overlay.innerHTML = '';
+        const hotspots = currentHotspots.hotspots;
+
+        Object.values(hotspots).forEach(hs => {
+          const box = document.createElement('div');
+          box.className = 'hotspot-box';
+          box.title = hs.label + (hs.confidence ? ' (置信度: ' + hs.confidence + ')' : '');
+
+          const wPercent = hs.width_ratio * 100;
+          const hPercent = hs.height_ratio * 100;
+
+          let left = 0, top = 0;
+          if (hs.position === 'calibrated' && hs.x_ratio !== undefined && hs.y_ratio !== undefined) {
+            // 校准模式：以 x_ratio/y_ratio 为中心
+            left = hs.x_ratio * 100 - wPercent / 2;
+            top = hs.y_ratio * 100 - hPercent / 2;
+          } else if (hs.position === 'left_top') {
+            left = 0;
+            top = 0;
+          } else if (hs.position === 'right_bottom') {
+            left = 100 - wPercent;
+            top = 100 - hPercent;
+          } else if (hs.position === 'center_bottom') {
+            left = (100 - wPercent) / 2;
+            top = 100 - hPercent;
+          } else {
+            left = (100 - wPercent) / 2;
+            top = (100 - hPercent) / 2;
+          }
+
+          box.style.left = Math.max(0, Math.min(100 - wPercent, left)) + '%';
+          box.style.top = Math.max(0, Math.min(100 - hPercent, top)) + '%';
+          box.style.width = wPercent + '%';
+          box.style.height = hPercent + '%';
+
+          box.innerHTML = '<span class="hotspot-label">' + escapeHtml(hs.label) + '</span>';
+
+          box.onclick = (e) => {
+            e.stopPropagation();
+            openModal(hs);
+          };
+
+          overlay.appendChild(box);
+        });
+      }
+
+      async function updateStatus() {
+        if (!currentHwnd) return;
+        try {
+          const status = await remoteApi.getScreenshotStatus(currentHwnd);
+          document.getElementById('intervalValue').textContent = formatInterval(status.current_interval);
+          document.getElementById('lastUpdate').textContent = formatAgo(status.last_screenshot_time);
+          document.getElementById('noChangeCount').textContent = status.no_change_count;
+        } catch (e) {}
+      }
+
+      function scheduleNextRefresh() {
+        if (refreshTimer) clearTimeout(refreshTimer);
+        if (!currentHwnd) return;
+
+        remoteApi.getScreenshotStatus(currentHwnd).then(status => {
+          const interval = (status.current_interval || 60) * 1000;
+          refreshTimer = setTimeout(() => loadScreenshot(false), interval);
+        }).catch(() => {
+          refreshTimer = setTimeout(() => loadScreenshot(false), 60000);
+        });
+      }
+
+      async function refreshScreenshot() {
+        if (!currentHwnd) return;
+        loadScreenshot(true);
+      }
+
+      function toggleHotspots() {
+        showHotspots = !showHotspots;
+        document.getElementById('hotspotLabel').textContent = showHotspots ? '隐藏热点' : '显示热点';
+        if (showHotspots) {
+          renderHotspots();
+        } else {
+          const overlay = document.getElementById('hotspotOverlay');
+          if (overlay) overlay.innerHTML = '';
+        }
+      }
+
+      let isCalibrated = false;
+
+      async function calibrateHotspots() {
+        if (!currentHwnd) {
+          showNotification('请先选择一个窗口', 'warning');
+          return;
+        }
+        const btn = document.getElementById('calibrateBtn');
+        btn.disabled = true;
+        showNotification('正在校准热点...', 'info');
+
+        try {
+          const result = await remoteApi.calibrateAndApply(currentHwnd, 'trae');
+          if (!result.success) {
+            showNotification('校准失败: ' + (result.detail || result.error || '未知错误'), 'error');
+            return;
+          }
+
+          // 用校准结果更新 currentHotspots
+          const calibrated = result.calibrated_hotspots;
+          const hotspotsObj = {};
+          for (const [key, hs] of Object.entries(calibrated)) {
+            hotspotsObj[key] = hs;
+          }
+          currentHotspots = { hotspots: hotspotsObj };
+          isCalibrated = true;
+
+          // 显示所有候选
+          if (result.all_candidates && result.all_candidates.length > 0) {
+            const names = result.all_candidates.map(c => '"' + c.text + '" (' + c.x_ratio + ', ' + c.y_ratio + ')').join('\n');
+            showNotification('校准完成，找到 ' + result.all_candidates.length + ' 个候选:\n' + names, 'success', 5000);
+          } else {
+            showNotification('校准完成，热点已更新', 'success');
+          }
+
+          // 自动显示热点
+          if (!showHotspots) {
+            toggleHotspots();
+          } else {
+            renderHotspots();
+          }
+        } catch (e) {
+          showNotification('校准失败: ' + e.message, 'error');
+        } finally {
+          btn.disabled = false;
+        }
+      }
+
+      function openModal(hotspot) {
+        currentHotspotKey = hotspot.name;
+        document.getElementById('modalTitle').textContent = '发送指令到 ' + hotspot.label;
+        document.getElementById('modalHint').textContent = '将点击 ' + hotspot.label + ' 并发送以下内容';
+        document.getElementById('modalTextarea').value = '';
+        document.getElementById('sendModal').classList.add('show');
+        setTimeout(() => document.getElementById('modalTextarea').focus(), 100);
+      }
+
+      function closeModal() {
+        document.getElementById('sendModal').classList.remove('show');
+      }
+
+      async function sendCommand() {
+        const text = document.getElementById('modalTextarea').value.trim();
+        if (!text || !currentHwnd) return;
+
+        closeModal();
+        showNotification('正在发送指令...', 'info');
+
+        try {
+          await remoteApi.sendText(currentHwnd, text, currentHotspotKey, true);
+          showNotification('指令已发送', 'success');
+          setTimeout(() => loadScreenshot(true), 2000);
+        } catch (e) {
+          showNotification('发送失败: ' + e.message, 'error');
+        }
+      }
+
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          closeModal();
+          closeKeyboardModal();
+          closeAuthModal();
+          closeAuditModal();
+          closeHelpModal();
+        }
+        if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+          if (document.getElementById('sendModal').classList.contains('show')) {
+            sendCommand();
+          }
+        }
+      });
+
+      function showKeyboardPanel() {
+        if (!currentHwnd) {
+          showNotification('请先选择一个窗口', 'warning');
+          return;
+        }
+        document.getElementById('keyboardModal').classList.add('show');
+      }
+
+      function closeKeyboardModal() {
+        document.getElementById('keyboardModal').classList.remove('show');
+      }
+
+      async function sendHotkey(keys) {
+        if (!currentHwnd) return;
+        showNotification('正在发送: ' + keys, 'info');
+        try {
+          await remoteApi.hotkey(currentHwnd, keys);
+          showNotification('热键已发送: ' + keys, 'success');
+        } catch (e) {
+          showNotification('发送失败: ' + e.message, 'error');
+        }
+      }
+
+      async function sendCustomHotkey() {
+        const input = document.getElementById('customHotkeyInput');
+        const keys = input.value.trim();
+        if (!keys) return;
+        await sendHotkey(keys);
+        input.value = '';
+      }
+
+      async function sendDirectText() {
+        if (!currentHwnd) return;
+        const input = document.getElementById('directTextInput');
+        const text = input.value.trim();
+        if (!text) return;
+        showNotification('正在输入文本...', 'info');
+        try {
+          await remoteApi.sendKeys(currentHwnd, text);
+          showNotification('文本已输入: ' + text.substring(0, 20), 'success');
+          input.value = '';
+        } catch (e) {
+          showNotification('输入失败: ' + e.message, 'error');
+        }
+      }
+
+      async function sendSequence() {
+        if (!currentHwnd) return;
+        const input = document.getElementById('sequenceInput');
+        let seq;
+        try {
+          seq = JSON.parse(input.value);
+        } catch (e) {
+          showNotification('序列格式错误: ' + e.message, 'error');
+          return;
+        }
+        showNotification('正在执行序列操作...', 'info');
+        try {
+          const result = await remoteApi.sequence(currentHwnd, seq);
+          if (result.success) {
+            showNotification('序列执行成功: ' + seq.length + ' 步', 'success');
+          } else {
+            showNotification('序列执行失败', 'error');
+          }
+        } catch (e) {
+          showNotification('序列执行失败: ' + e.message, 'error');
+        }
+      }
+
+      // ==================== 标签页切换 ====================
+
+      async function switchToNextTab() {
+        if (!currentHwnd) return;
+        try {
+          await remoteApi.nextTab(currentHwnd);
+          showNotification('已切换到下一个标签', 'success');
+          setTimeout(() => loadScreenshot(true), 500);
+        } catch (e) {
+          showNotification('切换失败: ' + e.message, 'error');
+        }
+      }
+
+      async function switchToPrevTab() {
+        if (!currentHwnd) return;
+        try {
+          await remoteApi.prevTab(currentHwnd);
+          showNotification('已切换到上一个标签', 'success');
+          setTimeout(() => loadScreenshot(true), 500);
+        } catch (e) {
+          showNotification('切换失败: ' + e.message, 'error');
+        }
+      }
+
+      function setupTabClickHandler() {
+        const img = document.getElementById('screenshotImg');
+        if (!img) return;
+
+        img.onclick = async (e) => {
+          const rect = img.getBoundingClientRect();
+          const xRatio = (e.clientX - rect.left) / rect.width;
+          const yRatio = (e.clientY - rect.top) / rect.height;
+
+          // 标签页区域在顶部 8%
+          if (yRatio < 0.08 && currentStar && currentStar.windows && currentStar.windows.length > 1) {
+            const totalTabs = currentStar.windows.length;
+            const tabWidth = 1.0 / totalTabs;
+            const tabIndex = Math.floor(xRatio / tabWidth) + 1;
+
+            if (tabIndex >= 1 && tabIndex <= totalTabs) {
+              try {
+                await remoteApi.switchTab(currentHwnd, tabIndex);
+                showNotification('已切换到标签 ' + tabIndex, 'success');
+                setTimeout(() => loadScreenshot(true), 500);
+              } catch (e) {
+                showNotification('切换失败: ' + e.message, 'error');
+              }
+            }
+          }
+        };
+      }
+
+      lucide.createIcons();
+      loadStars();
+      checkAuthStatus();
+
+      // ==================== 认证 ====================
+
+      function showAuthPanel() {
+        const input = document.getElementById('apiKeyInput');
+        if (input) input.value = remoteApi.getApiKey() || '';
+        document.getElementById('authModal').classList.add('show');
+        updateAuthBadge();
+      }
+
+      function closeAuthModal() {
+        document.getElementById('authModal').classList.remove('show');
+      }
+
+      async function checkAuthStatus() {
+        try {
+          const status = await remoteApi.getAuthStatus();
+          if (status.auth_enabled && !status.authenticated && remoteApi.getApiKey()) {
+            remoteApi.setApiKey('');
+            showNotification('API Key 无效，请重新设置', 'warning');
+          }
+          updateAuthBadge(status);
+        } catch (e) {}
+      }
+
+      function updateAuthBadge(status) {
+        const badge = document.getElementById('authStatusBadge');
+        const text = document.getElementById('authStatusText');
+        if (!badge || !text) return;
+
+        if (!status) {
+          badge.classList.remove('authenticated');
+          text.textContent = remoteApi.getApiKey() ? '已设置 Key' : '未认证';
+          return;
+        }
+
+        if (!status.auth_enabled) {
+          badge.classList.remove('authenticated');
+          text.textContent = '认证未启用';
+        } else if (status.authenticated) {
+          badge.classList.add('authenticated');
+          text.textContent = status.name + ' (' + status.role + ')';
+        } else {
+          badge.classList.remove('authenticated');
+          text.textContent = '未认证';
+        }
+      }
+
+      async function saveApiKey() {
+        const input = document.getElementById('apiKeyInput');
+        const key = input.value.trim();
+        if (!key) {
+          showNotification('请输入 API Key', 'warning');
+          return;
+        }
+        remoteApi.setApiKey(key);
+        try {
+          const status = await remoteApi.getAuthStatus();
+          updateAuthBadge(status);
+          if (status.auth_enabled && status.authenticated) {
+            showNotification('认证成功：' + status.name, 'success');
+            setTimeout(() => {
+              closeAuthModal();
+              loadStars();
+            }, 800);
+          } else if (!status.auth_enabled) {
+            showNotification('服务端未启用认证', 'info');
+            closeAuthModal();
+          } else {
+            showNotification('认证失败：无效的 API Key', 'error');
+            remoteApi.setApiKey('');
+          }
+        } catch (e) {
+          showNotification('认证检查失败: ' + e.message, 'error');
+        }
+      }
+
+      function clearApiKey() {
+        remoteApi.setApiKey('');
+        document.getElementById('apiKeyInput').value = '';
+        updateAuthBadge();
+        showNotification('API Key 已清除', 'info');
+      }
+
+      // ==================== 审计日志 ====================
+
+      function showAuditPanel() {
+        document.getElementById('auditModal').classList.add('show');
+        loadAuditLogs();
+        loadAuditStats();
+      }
+
+      function closeAuditModal() {
+        document.getElementById('auditModal').classList.remove('show');
+      }
+
+      async function loadAuditLogs() {
+        const container = document.getElementById('auditLogList');
+        if (!container) return;
+        container.innerHTML = '<div style="padding:20px;text-align:center;color:var(--color-text-muted);">加载中...</div>';
+
+        try {
+          const op = document.getElementById('auditOpFilter').value;
+          let url = '/api/remote/audit/logs?limit=30';
+          if (op) url += '&operation=' + encodeURIComponent(op);
+          if (currentHwnd) url += '&hwnd=' + currentHwnd;
+
+          const res = await remoteApi.getAuditLogs(op, currentHwnd);
+
+          if (!res || !res.logs || res.logs.length === 0) {
+            container.innerHTML = '<div style="padding:20px;text-align:center;color:var(--color-text-muted);">暂无审计日志</div>';
+            return;
+          }
+
+          let html = '<div style="display:flex;flex-direction:column;gap:4px;">';
+          res.logs.forEach(log => {
+            const isError = log.result !== 'success';
+            const color = isError ? 'var(--color-error,#ef4444)' : 'var(--color-text-secondary)';
+            const icon = isError ? '&#10060;' : '&#9989;';
+            const params = log.params && Object.keys(log.params).length > 0
+              ? Object.entries(log.params).map(([k, v]) => k + '=' + v).join(', ')
+              : '';
+
+            html += '<div style="display:flex;gap:8px;padding:6px 8px;background:var(--color-bg-card);border-radius:6px;font-size:12px;align-items:center;">';
+            html += '<span style="color:' + color + ';flex-shrink:0;">' + icon + '</span>';
+            html += '<span style="color:var(--color-text-muted);flex-shrink:0;font-family:var(--font-mono);font-size:11px;">' + log.time_str + '</span>';
+            html += '<span style="color:var(--color-text-primary);font-weight:500;flex-shrink:0;">' + log.operation + '</span>';
+            if (log.hwnd) html += '<span style="color:var(--color-text-muted);font-size:11px;font-family:var(--font-mono);">' + log.hwnd + '</span>';
+            if (params) html += '<span style="color:var(--color-text-muted);font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">(' + params + ')</span>';
+            html += '</div>';
+          });
+          html += '</div>';
+
+          container.innerHTML = html;
+        } catch (e) {
+          container.innerHTML = '<div style="padding:20px;text-align:center;color:var(--color-error,#ef4444);">加载失败: ' + e.message + '</div>';
+        }
+      }
+
+      // ==================== 帮助面板 ====================
+
+      function showHelpPanel() {
+        document.getElementById('helpModal').classList.add('show');
+      }
+
+      function closeHelpModal() {
+        document.getElementById('helpModal').classList.remove('show');
+      }
+
+      async function loadAuditStats() {
+        try {
+          const stats = await apiFetch('/api/remote/audit/stats');
+          const el = document.getElementById('auditStats');
+          if (el && stats) {
+            el.textContent = '共 ' + stats.total_entries + ' 条日志 | ' + (Object.keys(stats.operations || {}).length) + ' 种操作类型';
+          }
+        } catch (e) {}
+      }
+    </script>
+</body>
+</html>

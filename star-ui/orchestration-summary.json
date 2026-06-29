@@ -1,0 +1,59 @@
+{
+  "project": {
+    "name": "群星 Star 前端",
+    "operatingMode": "free-explore",
+    "deviceType": "desktop",
+    "styleDefinitionBrief": "Deep space command center UI — dark navy backgrounds (#0a0e27), starlight gold (#ffd700) accent, cosmic dashboard aesthetic with glowing elements, monospace data displays, sci-fi mission control vibe.",
+    "designRead": "dashboard / developers / professional-tech / information-dense / avoid-playful",
+    "designDials": {
+      "layoutVariance": 3,
+      "motionIntensity": 2,
+      "visualDensity": 4
+    },
+    "styleContinuityAnchors": {
+      "colorSystem": "deep-space-navy-gold",
+      "typographySystem": {
+        "display": "'Inter', 'Noto Sans SC', sans-serif",
+        "mono": "'JetBrains Mono', 'Fira Code', monospace"
+      },
+      "surfaceDepth": "border-first-static, shadow-only-floating",
+      "radiusScale": "restrained-4-8-12-16"
+    }
+  },
+  "designSource": {
+    "operatingMode": "free-explore",
+    "styleConstraints": {
+      "radiusMax": 16,
+      "staticShadowAlphaMax": 0.05
+    },
+    "brandCSSPath": "colors_and_type.css"
+  },
+  "pages": [
+    {
+      "slug": "starmap",
+      "title": "星图面板",
+      "pageType": "information-dense",
+      "description": "Agent discovery dashboard — real-time star field showing all detected AI Agent processes with status indicators, filters by type, and quick actions."
+    },
+    {
+      "slug": "orbit",
+      "title": "星轨控制台",
+      "pageType": "task-driven",
+      "description": "Task creation and queue management — nova creation form, priority selection, orbit queue with drag-reorder, launch/adjust/fade controls."
+    },
+    {
+      "slug": "starlight",
+      "title": "星辉审查",
+      "pageType": "information-dense",
+      "description": "Results review and echo management — starlight output stream, gaze history timeline, echo feedback panel, constellation overview."
+    }
+  ],
+  "images": [],
+  "wiringPlan": {
+    "topology": "linear",
+    "edges": [
+      { "from": "page-starmap", "to": "page-orbit", "label": "创建新星" },
+      { "from": "page-orbit", "to": "page-starlight", "label": "查看星辉" }
+    ]
+  }
+}

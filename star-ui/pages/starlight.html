@@ -1,0 +1,1565 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>星辉审查 — 群星 Star</title>
+    <style id="theme-vars">
+/* ============================================
+   群星 Star — Brand Design Tokens
+   Deep Space Theme
+   ============================================ */
+
+:root {
+  /* === Primary Palette === */
+  --color-bg-deep: #0a0e27;
+  --color-bg-panel: #1a1f3a;
+  --color-bg-card: #151934;
+  --color-bg-elevated: #212647;
+  --color-bg-hover: #2a3058;
+
+  /* === Accent: Starlight Gold === */
+  --color-primary: #ffd700;
+  --color-primary-dim: rgba(255, 215, 0, 0.15);
+  --color-primary-muted: rgba(255, 215, 0, 0.6);
+  --color-primary-glow: rgba(255, 215, 0, 0.25);
+
+  /* === Star Magnitude Colors === */
+  --color-star-supernova: #ffffff;
+  --color-star-bright: #4fc3f7;
+  --color-star-normal: #b0bec5;
+  --color-star-dim: #616161;
+
+  /* === Star Status Colors === */
+  --color-status-shining: #66bb6a;
+  --color-status-awaiting: #ffa726;
+  --color-status-faded: #ef5350;
+  --color-status-nascent: #ab47bc;
+  --color-status-orbiting: #42a5f5;
+  --color-status-constellated: #ffd700;
+  --color-status-darkened: #455a64;
+
+  /* === Semantic State === */
+  --state-success: #66bb6a;
+  --state-warning: #ffa726;
+  --state-error: #ef5350;
+  --state-info: #42a5f5;
+
+  /* === Text === */
+  --color-text-primary: #e8eaf6;
+  --color-text-secondary: #9fa8da;
+  --color-text-muted: #616885;
+  --color-text-gold: #ffd700;
+
+  /* === Border === */
+  --color-border: rgba(255, 255, 255, 0.08);
+  --color-border-subtle: rgba(255, 255, 255, 0.04);
+  --color-border-glow: rgba(255, 215, 0, 0.2);
+
+  /* === Surface Depth === */
+  --surface-1: #0a0e27;
+  --surface-2: #1a1f3a;
+  --surface-3: #212647;
+  --surface-4: #2a3058;
+
+  /* === Typography === */
+  --font-display: 'Inter', 'Noto Sans SC', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+  --font-body: var(--font-display);
+
+  /* === Font Sizes === */
+  --text-xs: 0.75rem;
+  --text-sm: 0.8125rem;
+  --text-base: 0.875rem;
+  --text-lg: 1rem;
+  --text-xl: 1.125rem;
+  --text-2xl: 1.5rem;
+  --text-3xl: 1.875rem;
+  --text-4xl: 2.25rem;
+
+  /* === Radius === */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-full: 9999px;
+
+  /* === Spacing === */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 12px;
+  --space-lg: 16px;
+  --space-xl: 24px;
+  --space-2xl: 32px;
+  --space-3xl: 48px;
+
+  /* === Shadows (static surfaces: border-first, alpha <= 0.05) === */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.05);
+  /* Floating layers only (modal, drawer, tooltip) */
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.15);
+  --shadow-glow: 0 0 20px rgba(255, 215, 0, 0.15);
+
+  /* === Transitions === */
+  --transition-fast: 150ms ease;
+  --transition-normal: 250ms ease;
+  --transition-slow: 400ms ease;
+}
+
+/* === Typography Classes === */
+.font-display { font-family: var(--font-display); }
+.font-mono { font-family: var(--font-mono); }
+.font-body { font-family: var(--font-body); }
+
+.text-xs { font-size: var(--text-xs); }
+.text-sm { font-size: var(--text-sm); }
+.text-base { font-size: var(--text-base); }
+.text-lg { font-size: var(--text-lg); }
+.text-xl { font-size: var(--text-xl); }
+.text-2xl { font-size: var(--text-2xl); }
+.text-3xl { font-size: var(--text-3xl); }
+.text-4xl { font-size: var(--text-4xl); }
+
+/* === Color Utility Classes === */
+.text-primary { color: var(--color-text-primary); }
+.text-secondary { color: var(--color-text-secondary); }
+.text-muted { color: var(--color-text-muted); }
+.text-gold { color: var(--color-text-gold); }
+
+.bg-deep { background-color: var(--color-bg-deep); }
+.bg-panel { background-color: var(--color-bg-panel); }
+.bg-card { background-color: var(--color-bg-card); }
+.bg-elevated { background-color: var(--color-bg-elevated); }
+.bg-hover { background-color: var(--color-bg-hover); }
+
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.3.1/dist/index.global.js"></script>
+    <script src="https://unpkg.com/lucide@1.8.0/dist/umd/lucide.min.js"></script>
+    <script src="/ui/js/api-bridge.js"></script>
+    <script src="/ui/js/nav.js"></script>
+    <script src="/ui/js/onboarding.js"></script>
+    <style type="text/tailwindcss">
+  @theme inline {
+    --color-primary: var(--color-primary);
+    --color-border: var(--color-border);
+    --color-surface-1: var(--surface-1);
+    --color-surface-2: var(--surface-2);
+    --color-surface-3: var(--surface-3);
+    --color-surface-4: var(--surface-4);
+  }
+  @layer base {
+    body {
+      background: var(--color-bg-deep);
+      color: var(--color-text-primary);
+    }
+    td, th { @apply break-words; word-break: break-all; word-break: auto-phrase; }
+    th { @apply whitespace-nowrap; }
+  }
+  @layer components {
+    .panel-card {
+      background-color: var(--color-bg-panel);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-lg);
+    }
+    .card-inner {
+      background-color: var(--color-bg-card);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+    }
+    .starlight-card-selected {
+      border-color: var(--color-border-glow);
+      box-shadow: var(--shadow-glow);
+    }
+    .sidebar-nav-item {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 40px;
+      height: 40px;
+      border-radius: var(--radius-md);
+      color: var(--color-text-muted);
+      transition: all var(--transition-fast);
+      position: relative;
+    }
+    .sidebar-nav-item:hover {
+      background-color: var(--color-bg-hover);
+      color: var(--color-text-primary);
+    }
+    .sidebar-nav-item.active {
+      color: var(--color-primary);
+      border-left: 2px solid var(--color-primary);
+    }
+    .sidebar-nav-item.active:hover {
+      color: var(--color-primary);
+    }
+    .badge-shining {
+      background-color: rgba(102, 187, 106, 0.15);
+      color: var(--color-status-shining);
+    }
+    .badge-awaiting {
+      background-color: rgba(255, 167, 38, 0.15);
+      color: var(--color-status-awaiting);
+    }
+    .badge-orbiting {
+      background-color: rgba(66, 165, 245, 0.15);
+      color: var(--color-status-orbiting);
+    }
+    .badge-nascent {
+      background-color: rgba(171, 71, 188, 0.15);
+      color: var(--color-status-nascent);
+    }
+    .code-block {
+      background-color: var(--color-bg-card);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      font-family: var(--font-mono);
+      font-size: var(--text-sm);
+      line-height: 1.6;
+      overflow-x: auto;
+    }
+    .code-line-num {
+      color: var(--color-text-muted);
+      user-select: none;
+      min-width: 2.5rem;
+      text-align: right;
+      padding-right: 1rem;
+      border-right: 1px solid var(--color-border-subtle);
+    }
+    .syntax-keyword { color: #c792ea; }
+    .syntax-string { color: #c3e88d; }
+    .syntax-comment { color: #546e7a; }
+    .syntax-function { color: #82aaff; }
+    .syntax-number { color: #f78c6c; }
+    .syntax-class { color: #ffcb6b; }
+    .syntax-decorator { color: #c792ea; }
+    .syntax-param { color: #f07178; }
+    .timeline-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .timeline-connector {
+      height: 2px;
+      flex-shrink: 0;
+      min-width: 2rem;
+    }
+    .progress-bar-gold {
+      background: linear-gradient(90deg, var(--color-primary), var(--color-status-shining));
+    }
+    .ws-indicator {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background-color: var(--color-status-shining);
+      animation: ws-pulse 2s infinite;
+    }
+    .echo-btn {
+      padding: 6px 14px;
+      border-radius: var(--radius-md);
+      font-size: var(--text-sm);
+      border: 1px solid var(--color-border);
+      background-color: var(--color-bg-card);
+      color: var(--color-text-secondary);
+      cursor: pointer;
+      transition: all var(--transition-fast);
+      white-space: nowrap;
+    }
+    .echo-btn:hover {
+      background-color: var(--color-bg-hover);
+      color: var(--color-text-primary);
+      border-color: var(--color-primary-muted);
+    }
+    .scrollbar-thin::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .scrollbar-thin::-webkit-scrollbar-track {
+      background: var(--color-bg-card);
+    }
+    .scrollbar-thin::-webkit-scrollbar-thumb {
+      background: var(--color-bg-elevated);
+      border-radius: 3px;
+    }
+    .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+      background: var(--color-bg-hover);
+    }
+  }
+  @keyframes ws-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+  @keyframes progress-animate {
+    0% { width: 0; }
+    100% { width: 65%; }
+  }
+  @keyframes dot-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(102, 187, 106, 0.6); }
+    50% { box-shadow: 0 0 0 6px rgba(102, 187, 106, 0); }
+  }
+  .dot-pulsing {
+    animation: dot-pulse 2s infinite;
+  }
+    </style>
+    <style>
+      .no-scrollbar::-webkit-scrollbar { display: none; }
+      .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      [data-icon] {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        -webkit-mask-size: contain;
+        mask-size: contain;
+        -webkit-mask-repeat: no-repeat;
+        mask-repeat: no-repeat;
+        -webkit-mask-position: center;
+        mask-position: center;
+        background-color: currentColor;
+      }
+    </style>
+</head>
+<body class="min-h-screen font-sans antialiased" style="background-color:var(--color-bg-deep);color:var(--color-text-primary);">
+    <main class="flex h-screen overflow-hidden">
+
+        <!-- ====== SIDEBAR ====== -->
+        <aside class="w-[60px] flex-shrink-0 flex flex-col items-center py-4 h-full" style="background-color:var(--color-bg-panel);border-right:1px solid var(--color-border);">
+            <!-- Logo -->
+            <div class="flex items-center justify-center w-10 h-10 mb-8 text-xl" style="color:var(--color-primary);font-weight:700;">
+                ★
+            </div>
+
+            <!-- Navigation -->
+            <nav class="flex flex-col items-center gap-2 flex-1">
+                <a href="/ui/pages/starmap.html" class="sidebar-nav-item" data-dom-id="nav-starmap" title="Star Map">
+                    <i data-lucide="map" style="width:20px;height:20px;"></i>
+                </a>
+                <a href="/ui/pages/orbit.html" class="sidebar-nav-item" data-dom-id="nav-orbit" title="Orbit Console">
+                    <i data-lucide="orbit" style="width:20px;height:20px;"></i>
+                </a>
+                <a href="/ui/pages/starlight.html" class="sidebar-nav-item active" data-dom-id="nav-starlight" title="Starlight Review">
+                    <i data-lucide="sun" style="width:20px;height:20px;"></i>
+                </a>
+            </nav>
+
+            <!-- Settings -->
+            <div class="mt-auto">
+                <a href="#" class="sidebar-nav-item" title="Settings">
+                    <i data-lucide="settings" style="width:20px;height:20px;"></i>
+                </a>
+            </div>
+        </aside>
+
+        <!-- ====== MAIN AREA ====== -->
+        <div class="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
+
+            <!-- ====== TOP HEADER BAR ====== -->
+            <header class="flex-shrink-0 flex items-center justify-between px-6 py-3 gap-4" style="background-color:var(--color-bg-panel);border-bottom:1px solid var(--color-border);">
+                <!-- Left: Title + Breadcrumb + Star Select -->
+                <div class="flex items-center gap-3 min-w-0">
+                    <h1 class="text-xl truncate flex-shrink-0" style="color:var(--color-text-gold);font-family:var(--font-display);font-weight:700;">
+                        星辉审查 / Starlight Review
+                    </h1>
+                    <span class="text-sm whitespace-nowrap flex-shrink-0" style="color:var(--color-text-muted);">群星 Star &gt; 星辉</span>
+                    <!-- Star Selector Dropdown -->
+                    <div class="relative ml-2 flex-shrink-0" id="star-selector-wrapper">
+                        <select id="star-selector" class="appearance-none pl-3 pr-9 py-1.5 text-sm border rounded-lg cursor-pointer focus:outline-none"
+                                style="background:var(--color-bg-card);border-color:var(--color-border);color:var(--color-text-primary);min-width:160px;">
+                            <option value="">加载星体中...</option>
+                        </select>
+                        <i data-lucide="chevron-down" class="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none" style="color:var(--color-text-muted);"></i>
+                    </div>
+                </div>
+                <!-- Right: Badge + WebSocket -->
+                <div class="flex items-center gap-4 flex-shrink-0">
+                    <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-sm font-mono" style="background-color:rgba(255,215,0,0.12);color:var(--color-primary);border:1px solid var(--color-border-glow);">
+                        待审查: 2
+                    </span>
+                    <span class="inline-flex items-center gap-2 text-sm" style="color:var(--color-status-shining);">
+                        <span class="ws-indicator"></span>
+                        实时连接中
+                    </span>
+                </div>
+            </header>
+
+            <!-- ====== SCROLLABLE CONTENT ====== -->
+            <div class="flex-1 overflow-y-auto scrollbar-thin" style="background-color:var(--color-bg-deep);">
+
+                <!-- ====== STATS BAR ====== -->
+                <section class="px-6 pt-5 pb-3">
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div class="panel-card p-4">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-sm" style="color:var(--color-text-muted);">今日识别次数</span>
+                                <i data-lucide="scan-eye" style="width:18px;height:18px;color:var(--color-primary);"></i>
+                            </div>
+                            <div class="text-2xl font-bold font-mono" style="color:var(--color-text-primary);" id="stat-today-count">128</div>
+                            <div class="text-xs mt-1" style="color:var(--color-status-shining);">↑ 12% 较昨日</div>
+                        </div>
+                        <div class="panel-card p-4">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-sm" style="color:var(--color-text-muted);">平均置信度</span>
+                                <i data-lucide="target" style="width:18px;height:18px;color:var(--color-status-shining);"></i>
+                            </div>
+                            <div class="text-2xl font-bold font-mono" id="stat-avg-confidence" style="color:var(--color-status-shining);">94.2%</div>
+                            <div class="text-xs mt-1" style="color:var(--color-text-muted);">基于最近 50 次识别</div>
+                        </div>
+                        <div class="panel-card p-4">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-sm" style="color:var(--color-text-muted);">当前 FPS</span>
+                                <div class="flex items-center gap-1.5">
+                                    <span class="w-2 h-2 rounded-full dot-pulsing" style="background-color:var(--color-status-shining);"></span>
+                                    <i data-lucide="activity" style="width:18px;height:18px;color:var(--color-status-shining);"></i>
+                                </div>
+                            </div>
+                            <div class="text-2xl font-bold font-mono" id="stat-fps" style="color:var(--color-status-shining);">24</div>
+                            <div class="text-xs mt-1" style="color:var(--color-text-muted);">帧/秒</div>
+                        </div>
+                        <div class="panel-card p-4">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-sm" style="color:var(--color-text-muted);">活跃星体数</span>
+                                <i data-lucide="sparkles" style="width:18px;height:18px;color:var(--color-star-bright);"></i>
+                            </div>
+                            <div class="text-2xl font-bold font-mono" style="color:var(--color-text-primary);" id="stat-active-stars">3</div>
+                            <div class="text-xs mt-1" style="color:var(--color-text-muted);">OCR 流连接中</div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ====== TOP SECTION: Active Starlight Stream ====== -->
+                <section class="px-6 pb-3">
+                    <h2 class="text-sm font-semibold mb-3 uppercase tracking-wider" style="color:var(--color-text-muted);font-family:var(--font-display);">
+                        实时星辉流 / Active Starlight Stream
+                    </h2>
+                    <div class="flex gap-4 overflow-x-auto pb-2 no-scrollbar" id="starlight-stream-container">
+
+                        <!-- OCR Stream Card 1: Selected (Expanded) -->
+                        <div class="panel-card starlight-card-selected p-4 flex-shrink-0 flex flex-col" style="width:400px;cursor:default;">
+                            <div class="flex items-center justify-between mb-3">
+                                <div class="flex items-center gap-2">
+                                    <span class="w-2 h-2 rounded-full dot-pulsing" style="background-color:var(--color-status-shining);"></span>
+                                    <span class="font-mono text-sm" style="color:var(--color-text-gold);">Trae</span>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs badge-shining">传输中</span>
+                                    <button class="w-7 h-7 flex items-center justify-center rounded-md transition-all" style="background-color:var(--color-bg-card);border:1px solid var(--color-border);cursor:pointer;" onclick="openFullscreen('a1b2c3d4')" title="全屏查看">
+                                        <i data-lucide="maximize-2" style="width:14px;height:14px;color:var(--color-text-secondary);"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <p class="text-base mb-2 truncate" style="color:var(--color-text-primary);font-weight:600;">生成用户登录模块</p>
+                            <div class="flex items-center gap-3 mb-3 text-sm" style="color:var(--color-text-secondary);">
+                                <span class="font-mono text-xs" style="color:var(--color-text-muted);">PID: 12480</span>
+                                <span class="font-mono text-xs" style="color:var(--color-text-muted);">运行中 3:42</span>
+                            </div>
+                            <!-- Confidence Bar Chart -->
+                            <div class="card-inner p-3 mb-3">
+                                <div class="flex items-center justify-between mb-2">
+                                    <span class="text-xs" style="color:var(--color-text-muted);">区域置信度</span>
+                                    <span class="text-xs font-mono" style="color:var(--color-status-shining);">94.2%</span>
+                                </div>
+                                <div class="space-y-1.5">
+                                    <div class="flex items-center gap-2">
+                                        <span class="text-xs w-16 flex-shrink-0" style="color:var(--color-text-muted);">任务列表</span>
+                                        <div class="flex-1 h-2 rounded-full" style="background-color:var(--color-bg-deep);">
+                                            <div class="h-full rounded-full" style="width:96%;background-color:var(--color-status-shining);"></div>
+                                        </div>
+                                        <span class="text-xs font-mono w-10 text-right" style="color:var(--color-status-shining);">96%</span>
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <span class="text-xs w-16 flex-shrink-0" style="color:var(--color-text-muted);">对话区</span>
+                                        <div class="flex-1 h-2 rounded-full" style="background-color:var(--color-bg-deep);">
+                                            <div class="h-full rounded-full" style="width:95%;background-color:var(--color-status-shining);"></div>
+                                        </div>
+                                        <span class="text-xs font-mono w-10 text-right" style="color:var(--color-status-shining);">95%</span>
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <span class="text-xs w-16 flex-shrink-0" style="color:var(--color-text-muted);">输入框</span>
+                                        <div class="flex-1 h-2 rounded-full" style="background-color:var(--color-bg-deep);">
+                                            <div class="h-full rounded-full" style="width:92%;background-color:var(--color-status-shining);"></div>
+                                        </div>
+                                        <span class="text-xs font-mono w-10 text-right" style="color:var(--color-status-shining);">92%</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- OCR Text Preview -->
+                            <div class="card-inner p-3 mb-3 flex-1 overflow-hidden">
+                                <div class="flex items-center justify-between mb-2">
+                                    <span class="text-xs" style="color:var(--color-text-muted);">OCR 文本预览</span>
+                                    <span class="text-xs font-mono" style="color:var(--color-text-muted);">最近 5 行</span>
+                                </div>
+                                <div class="space-y-1 text-xs overflow-y-auto scrollbar-thin" style="max-height:80px;color:var(--color-text-secondary);font-family:var(--font-mono);">
+                                    <div>class LoginHandler:</div>
+                                    <div>    def __init__(self, db):</div>
+                                    <div>        self.db = db</div>
+                                    <div>        self.session = SessionManager()</div>
+                                    <div>        self.token_expiry = timedelta(hours=24)</div>
+                                </div>
+                            </div>
+                            <!-- Progress Bar -->
+                            <div class="w-full rounded-full" style="height:4px;background-color:var(--color-bg-card);">
+                                <div class="rounded-full progress-bar-gold" style="height:4px;animation:progress-animate 2s ease-out forwards;"></div>
+                            </div>
+                        </div>
+
+                        <!-- OCR Stream Card 2 -->
+                        <div class="panel-card p-4 flex-shrink-0 flex flex-col" style="width:360px;cursor:pointer;">
+                            <div class="flex items-center justify-between mb-2">
+                                <div class="flex items-center gap-2">
+                                    <span class="w-2 h-2 rounded-full" style="background-color:var(--color-status-awaiting);"></span>
+                                    <span class="font-mono text-sm" style="color:var(--color-text-secondary);">Claude</span>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs badge-awaiting">待回响</span>
+                                    <button class="w-7 h-7 flex items-center justify-center rounded-md transition-all" style="background-color:var(--color-bg-card);border:1px solid var(--color-border);cursor:pointer;" onclick="openFullscreen('m3n4o5p6')" title="全屏查看">
+                                        <i data-lucide="maximize-2" style="width:14px;height:14px;color:var(--color-text-secondary);"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <p class="text-base mb-2 truncate" style="color:var(--color-text-primary);font-weight:600;">生成API文档</p>
+                            <!-- Confidence Bar Chart -->
+                            <div class="card-inner p-3 mb-3">
+                                <div class="flex items-center justify-between mb-2">
+                                    <span class="text-xs" style="color:var(--color-text-muted);">区域置信度</span>
+                                    <span class="text-xs font-mono" style="color:var(--color-status-awaiting);">78.5%</span>
+                                </div>
+                                <div class="space-y-1.5">
+                                    <div class="flex items-center gap-2">
+                                        <span class="text-xs w-16 flex-shrink-0" style="color:var(--color-text-muted);">任务列表</span>
+                                        <div class="flex-1 h-2 rounded-full" style="background-color:var(--color-bg-deep);">
+                                            <div class="h-full rounded-full" style="width:85%;background-color:var(--color-status-awaiting);"></div>
+                                        </div>
+                                        <span class="text-xs font-mono w-10 text-right" style="color:var(--color-status-awaiting);">85%</span>
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <span class="text-xs w-16 flex-shrink-0" style="color:var(--color-text-muted);">对话区</span>
+                                        <div class="flex-1 h-2 rounded-full" style="background-color:var(--color-bg-deep);">
+                                            <div class="h-full rounded-full" style="width:72%;background-color:var(--color-status-awaiting);"></div>
+                                        </div>
+                                        <span class="text-xs font-mono w-10 text-right" style="color:var(--color-status-awaiting);">72%</span>
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <span class="text-xs w-16 flex-shrink-0" style="color:var(--color-text-muted);">输入框</span>
+                                        <div class="flex-1 h-2 rounded-full" style="background-color:var(--color-bg-deep);">
+                                            <div class="h-full rounded-full" style="width:78%;background-color:var(--color-status-awaiting);"></div>
+                                        </div>
+                                        <span class="text-xs font-mono w-10 text-right" style="color:var(--color-status-awaiting);">78%</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- OCR Text Preview -->
+                            <div class="card-inner p-3 mb-3 flex-1 overflow-hidden">
+                                <div class="flex items-center justify-between mb-2">
+                                    <span class="text-xs" style="color:var(--color-text-muted);">OCR 文本预览</span>
+                                    <span class="text-xs font-mono" style="color:var(--color-text-muted);">最近 5 行</span>
+                                </div>
+                                <div class="space-y-1 text-xs overflow-y-auto scrollbar-thin" style="max-height:60px;color:var(--color-text-secondary);font-family:var(--font-mono);">
+                                    <div># API Documentation</div>
+                                    <div>## Authentication</div>
+                                    <div>POST /api/v1/auth/login</div>
+                                    <div>- Authenticate user credentials</div>
+                                    <div>- Returns JWT token</div>
+                                </div>
+                            </div>
+                            <div class="flex justify-end">
+                                <button class="echo-btn text-sm" style="border-color:var(--color-primary-muted);color:var(--color-primary);">添加回响</button>
+                            </div>
+                        </div>
+
+                        <!-- OCR Stream Card 3 -->
+                        <div class="panel-card p-4 flex-shrink-0 flex flex-col" style="width:360px;cursor:pointer;">
+                            <div class="flex items-center justify-between mb-2">
+                                <div class="flex items-center gap-2">
+                                    <span class="w-2 h-2 rounded-full" style="background-color:var(--color-status-orbiting);"></span>
+                                    <span class="font-mono text-sm" style="color:var(--color-text-secondary);">CodeArts</span>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs badge-orbiting">初始化</span>
+                                    <button class="w-7 h-7 flex items-center justify-center rounded-md transition-all" style="background-color:var(--color-bg-card);border:1px solid var(--color-border);cursor:pointer;" onclick="openFullscreen('e5f6g7h8')" title="全屏查看">
+                                        <i data-lucide="maximize-2" style="width:14px;height:14px;color:var(--color-text-secondary);"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <p class="text-base mb-2 truncate" style="color:var(--color-text-primary);font-weight:600;">审查安全漏洞</p>
+                            <!-- Confidence Bar Chart -->
+                            <div class="card-inner p-3 mb-3">
+                                <div class="flex items-center justify-between mb-2">
+                                    <span class="text-xs" style="color:var(--color-text-muted);">区域置信度</span>
+                                    <span class="text-xs font-mono" style="color:var(--color-status-faded);">62.1%</span>
+                                </div>
+                                <div class="space-y-1.5">
+                                    <div class="flex items-center gap-2">
+                                        <span class="text-xs w-16 flex-shrink-0" style="color:var(--color-text-muted);">任务列表</span>
+                                        <div class="flex-1 h-2 rounded-full" style="background-color:var(--color-bg-deep);">
+                                            <div class="h-full rounded-full" style="width:65%;background-color:var(--color-status-faded);"></div>
+                                        </div>
+                                        <span class="text-xs font-mono w-10 text-right" style="color:var(--color-status-faded);">65%</span>
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <span class="text-xs w-16 flex-shrink-0" style="color:var(--color-text-muted);">对话区</span>
+                                        <div class="flex-1 h-2 rounded-full" style="background-color:var(--color-bg-deep);">
+                                            <div class="h-full rounded-full" style="width:58%;background-color:var(--color-status-faded);"></div>
+                                        </div>
+                                        <span class="text-xs font-mono w-10 text-right" style="color:var(--color-status-faded);">58%</span>
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <span class="text-xs w-16 flex-shrink-0" style="color:var(--color-text-muted);">输入框</span>
+                                        <div class="flex-1 h-2 rounded-full" style="background-color:var(--color-bg-deep);">
+                                            <div class="h-full rounded-full" style="width:63%;background-color:var(--color-status-faded);"></div>
+                                        </div>
+                                        <span class="text-xs font-mono w-10 text-right" style="color:var(--color-status-faded);">63%</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- OCR Text Preview -->
+                            <div class="card-inner p-3 mb-3 flex-1 overflow-hidden">
+                                <div class="flex items-center justify-between mb-2">
+                                    <span class="text-xs" style="color:var(--color-text-muted);">OCR 文本预览</span>
+                                    <span class="text-xs font-mono" style="color:var(--color-text-muted);">最近 5 行</span>
+                                </div>
+                                <div class="space-y-1 text-xs overflow-y-auto scrollbar-thin" style="max-height:60px;color:var(--color-text-muted);font-family:var(--font-mono);">
+                                    <div style="color:var(--color-text-muted);">等待 OCR 初始化...</div>
+                                    <div style="color:var(--color-text-muted);">正在连接摄像头...</div>
+                                    <div style="color:var(--color-text-muted);">校准区域坐标...</div>
+                                </div>
+                            </div>
+                            <div class="card-inner p-3 text-sm text-center" style="color:var(--color-text-muted);">
+                                初始化中...
+                            </div>
+                        </div>
+
+                    </div>
+                </section>
+
+                <!-- ====== VISUALIZATION SECTION ====== -->
+                <section class="px-6 py-3">
+                    <div class="flex flex-col lg:flex-row gap-4">
+                        <!-- Confidence Heatmap -->
+                        <div class="panel-card p-5 flex-1 min-w-0">
+                            <div class="flex items-center justify-between mb-4">
+                                <h2 class="text-base font-semibold" style="color:var(--color-text-primary);">
+                                    置信度热力图 / Confidence Heatmap
+                                </h2>
+                                <span class="text-xs font-mono" style="color:var(--color-text-muted);">6x4 区域网格</span>
+                            </div>
+                            <div class="flex items-center gap-4 mb-4">
+                                <div class="flex items-center gap-2">
+                                    <span class="text-xs" style="color:var(--color-text-muted);">低</span>
+                                    <div class="w-24 h-2 rounded-full" style="background:linear-gradient(90deg, var(--color-status-faded), var(--color-status-awaiting), var(--color-status-shining));"></div>
+                                    <span class="text-xs" style="color:var(--color-text-muted);">高</span>
+                                </div>
+                                <span class="text-xs font-mono" id="heatmap-avg" style="color:var(--color-status-shining);">平均: 94.2%</span>
+                            </div>
+                            <div id="confidence-heatmap" class="grid gap-1.5" style="grid-template-columns:repeat(6,1fr);">
+                            </div>
+                        </div>
+
+                        <!-- Response Timeline -->
+                        <div class="panel-card p-5 flex-1 min-w-0">
+                            <div class="flex items-center justify-between mb-4">
+                                <h2 class="text-base font-semibold" style="color:var(--color-text-primary);">
+                                    响应时间线 / Response Timeline
+                                </h2>
+                                <span class="text-xs font-mono" style="color:var(--color-text-muted);">最近 10 次</span>
+                            </div>
+                            <div class="flex items-center gap-4 mb-4">
+                                <div class="flex items-center gap-2">
+                                    <span class="w-3 h-3 rounded" style="background-color:var(--color-status-shining);"></span>
+                                    <span class="text-xs" style="color:var(--color-text-muted);">快 (&lt;100ms)</span>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <span class="w-3 h-3 rounded" style="background-color:var(--color-status-awaiting);"></span>
+                                    <span class="text-xs" style="color:var(--color-text-muted);">中 (&lt;200ms)</span>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <span class="w-3 h-3 rounded" style="background-color:var(--color-status-faded);"></span>
+                                    <span class="text-xs" style="color:var(--color-text-muted);">慢 (&ge;200ms)</span>
+                                </div>
+                            </div>
+                            <div id="response-timeline" class="flex items-end justify-between gap-1 h-32">
+                            </div>
+                            <div class="flex justify-between mt-2">
+                                <span class="text-xs font-mono" style="color:var(--color-text-muted);">16:42:01</span>
+                                <span class="text-xs font-mono" id="timeline-avg" style="color:var(--color-status-shining);">平均: 85ms</span>
+                                <span class="text-xs font-mono" style="color:var(--color-text-muted);">现在</span>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ====== MIDDLE SECTION: Selected Nova Detail ====== -->
+                <section class="px-6 py-3">
+                    <div class="flex flex-col lg:flex-row gap-4">
+
+                        <!-- Left: Output Display (65%) -->
+                        <div class="panel-card flex-1 min-w-0 p-5 flex flex-col" style="flex:65;">
+                            <!-- Title -->
+                            <div class="flex items-center justify-between mb-4">
+                                <div class="flex items-center gap-2">
+                                    <h2 class="text-base font-semibold" style="color:var(--color-text-primary);">
+                                        星辉输出 / Starlight Output
+                                    </h2>
+                                    <span id="source-badge" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium" style="background-color:rgba(255,215,0,0.12);color:var(--color-primary);border:1px solid var(--color-border-glow);">
+                                        <i data-lucide="scan-eye" style="width:12px;height:12px;"></i>
+                                        来源: OCR
+                                    </span>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <button id="ocr-stream-toggle" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-sm transition-all" style="background-color:var(--color-bg-card);color:var(--color-text-secondary);border:1px solid var(--color-border);cursor:pointer;">
+                                        <i data-lucide="radio" style="width:14px;height:14px;"></i>
+                                        <span>实时流</span>
+                                    </button>
+                                    <button class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-sm" style="background-color:var(--color-bg-card);color:var(--color-text-secondary);border:1px solid var(--color-border);cursor:pointer;" title="Copy to clipboard">
+                                        <i data-lucide="copy" style="width:14px;height:14px;"></i>
+                                        <span>复制</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Tab Switcher -->
+                            <div class="flex gap-1 mb-4 p-1 rounded-lg" style="background-color:var(--color-bg-card);">
+                                <button class="px-4 py-1.5 rounded-md text-sm" style="background-color:var(--color-bg-elevated);color:var(--color-primary);font-weight:600;">完整输出</button>
+                                <button class="px-4 py-1.5 rounded-md text-sm" style="color:var(--color-text-muted);cursor:pointer;">对话历史</button>
+                                <button class="px-4 py-1.5 rounded-md text-sm" style="color:var(--color-text-muted);cursor:pointer;">观星日志</button>
+                            </div>
+
+                            <!-- Code Output Area -->
+                            <div id="starlight-output" class="code-block p-4 flex-1 overflow-auto" style="max-height:340px;">
+                                <div class="flex gap-0">
+                                    <div class="code-line-num text-xs leading-6">
+                                        <div>1</div><div>2</div><div>3</div><div>4</div><div>5</div><div>6</div><div>7</div><div>8</div><div>9</div><div>10</div><div>11</div><div>12</div><div>13</div><div>14</div><div>15</div><div>16</div><div>17</div><div>18</div><div>19</div><div>20</div><div>21</div><div>22</div><div>23</div><div>24</div><div>25</div><div>26</div><div>27</div><div>28</div><div>29</div><div>30</div><div>31</div><div>32</div><div>33</div><div>34</div><div>35</div><div>36</div><div>37</div><div>38</div><div>39</div><div>40</div><div>41</div><div>42</div>
+                                    </div>
+                                    <div class="flex-1 text-xs leading-6" style="white-space:pre;overflow-x:auto;">
+<span class="syntax-comment">"""
+用户登录模块 — User Login Module
+处理认证、会话管理和令牌生成
+"""</span>
+
+<span class="syntax-keyword">import</span> hashlib
+<span class="syntax-keyword">import</span> jwt
+<span class="syntax-keyword">from</span> datetime <span class="syntax-keyword">import</span> datetime, timedelta
+
+<span class="syntax-keyword">class</span> <span class="syntax-class">LoginHandler</span>:
+    <span class="syntax-string">"""处理用户登录的核心处理器"""</span>
+
+    <span class="syntax-keyword">def</span> <span class="syntax-function">__init__</span>(<span class="syntax-param">self</span>, db_conn, secret_key):
+        <span class="syntax-param">self</span>.db = db_conn
+        <span class="syntax-param">self</span>.secret = secret_key
+        <span class="syntax-param">self</span>.token_expiry = timedelta(hours=<span class="syntax-number">24</span>)
+
+    <span class="syntax-keyword">async def</span> <span class="syntax-function">authenticate</span>(<span class="syntax-param">self</span>, username, password):
+        <span class="syntax-string">"""验证用户凭证"""</span>
+        user = <span class="syntax-keyword">await</span> <span class="syntax-param">self</span>.db.<span class="syntax-function">find_user</span>(username)
+        <span class="syntax-keyword">if not</span> user:
+            <span class="syntax-keyword">raise</span> <span class="syntax-class">AuthError</span>(<span class="syntax-string">"用户不存在"</span>)
+
+        hashed = hashlib.sha256(password.encode()).hexdigest()
+        <span class="syntax-keyword">if</span> hashed != user[<span class="syntax-string">"password_hash"</span>]:
+            <span class="syntax-keyword">raise</span> <span class="syntax-class">AuthError</span>(<span class="syntax-string">"密码错误"</span>)
+
+        token = <span class="syntax-param">self</span>.<span class="syntax-function">_generate_token</span>(user[<span class="syntax-string">"id"</span>])
+        <span class="syntax-keyword">return</span> {<span class="syntax-string">"token"</span>: token, <span class="syntax-string">"user_id"</span>: user[<span class="syntax-string">"id"</span>]}
+
+    <span class="syntax-keyword">def</span> <span class="syntax-function">_generate_token</span>(<span class="syntax-param">self</span>, user_id):
+        payload = {
+            <span class="syntax-string">"user_id"</span>: user_id,
+            <span class="syntax-string">"exp"</span>: datetime.utcnow() + <span class="syntax-param">self</span>.token_expiry
+        }
+        <span class="syntax-keyword">return</span> jwt.<span class="syntax-function">encode</span>(payload, <span class="syntax-param">self</span>.secret, algorithm=<span class="syntax-string">"HS256"</span>)
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Log Collapsible Panel -->
+                            <div class="mt-4">
+                                <button id="log-panel-toggle" class="w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-all" style="background-color:var(--color-bg-card);border:1px solid var(--color-border);color:var(--color-text-secondary);cursor:pointer;">
+                                    <div class="flex items-center gap-2">
+                                        <i data-lucide="file-text" style="width:14px;height:14px;"></i>
+                                        <span>日志原文</span>
+                                    </div>
+                                    <i data-lucide="chevron-down" id="log-panel-icon" style="width:16px;height:16px;transition:transform 0.2s;"></i>
+                                </button>
+                                <div id="log-panel-content" class="hidden mt-2 code-block p-3 overflow-auto" style="max-height:200px;">
+                                    <div class="text-xs leading-5 font-mono" style="color:var(--color-text-secondary);white-space:pre-wrap;">加载日志中...</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Right: Echo Panel (35%) -->
+                        <div class="panel-card p-5 flex-shrink-0 lg:w-[35%]">
+                            <!-- Title -->
+                            <h2 class="text-base font-semibold mb-3" style="color:var(--color-text-primary);">
+                                回响 / Echo
+                            </h2>
+
+                            <!-- Status Summary -->
+                            <div class="card-inner p-3 mb-4 flex items-center gap-2">
+                                <span class="ws-indicator" style="width:6px;height:6px;"></span>
+                                <span class="text-sm" style="color:var(--color-text-secondary);">任务执行中，星辉持续收集中...</span>
+                            </div>
+
+                            <!-- Quick Echo Buttons -->
+                            <div class="flex flex-wrap gap-2 mb-4">
+                                <button class="echo-btn">
+                                    <i data-lucide="play" style="width:12px;height:12px;display:inline;vertical-align:middle;margin-right:4px;"></i>继续
+                                </button>
+                                <button class="echo-btn">
+                                    <i data-lucide="compass" style="width:12px;height:12px;display:inline;vertical-align:middle;margin-right:4px;"></i>修改方向
+                                </button>
+                                <button class="echo-btn">
+                                    <i data-lucide="check-circle" style="width:12px;height:12px;display:inline;vertical-align:middle;margin-right:4px;"></i>满意
+                                </button>
+                                <button class="echo-btn">
+                                    <i data-lucide="x-circle" style="width:12px;height:12px;display:inline;vertical-align:middle;margin-right:4px;"></i>不满意
+                                </button>
+                            </div>
+
+                            <!-- Echo Textarea -->
+                            <div class="mb-3">
+                                <textarea class="w-full rounded-lg p-3 text-sm resize-none" rows="5" placeholder="输入你的回响指令..." style="background-color:var(--color-bg-card);border:1px solid var(--color-border);color:var(--color-text-primary);outline:none;font-family:var(--font-display);"></textarea>
+                            </div>
+
+                            <!-- Submit Button -->
+                            <button class="w-full py-2.5 rounded-lg text-sm font-semibold" style="background:linear-gradient(135deg, var(--color-primary), #e6c200);color:#0a0e27;border:none;cursor:pointer;font-weight:700;">
+                                发送回响
+                            </button>
+                        </div>
+
+                    </div>
+                </section>
+
+                <!-- ====== BOTTOM CONTROL PANEL ====== -->
+                <section class="px-6 pt-3 pb-3">
+                    <div class="panel-card p-5">
+                        <div class="flex flex-col lg:flex-row lg:items-center gap-6">
+                            <div class="flex items-center gap-4">
+                                <div class="flex flex-col gap-1">
+                                    <span class="text-sm font-semibold" style="color:var(--color-text-primary);">OCR 识别</span>
+                                    <span class="text-xs" style="color:var(--color-text-muted);">开启实时 OCR 识别流</span>
+                                </div>
+                                <button id="control-ocr-toggle" class="relative w-12 h-6 rounded-full transition-all" style="background-color:var(--color-status-shining);cursor:pointer;" onclick="toggleControlOcr()">
+                                    <span id="control-ocr-knob" class="absolute top-0.5 right-0.5 w-5 h-5 rounded-full transition-all" style="background-color:white;"></span>
+                                </button>
+                            </div>
+                            <div class="h-px lg:h-10 lg:w-px" style="background-color:var(--color-border);"></div>
+                            <div class="flex-1 min-w-0">
+                                <div class="flex items-center justify-between mb-2">
+                                    <span class="text-sm font-semibold" style="color:var(--color-text-primary);">识别间隔</span>
+                                    <span class="text-sm font-mono" id="interval-value" style="color:var(--color-primary);">3 秒</span>
+                                </div>
+                                <input id="interval-slider" type="range" min="1" max="30" value="3" 
+                                    class="w-full h-2 rounded-lg appearance-none cursor-pointer"
+                                    style="background-color:var(--color-bg-card);accent-color:var(--color-primary);"
+                                    oninput="updateInterval(this.value)">
+                                <div class="flex justify-between mt-1">
+                                    <span class="text-xs" style="color:var(--color-text-muted);">1s</span>
+                                    <span class="text-xs" style="color:var(--color-text-muted);">15s</span>
+                                    <span class="text-xs" style="color:var(--color-text-muted);">30s</span>
+                                </div>
+                            </div>
+                            <div class="h-px lg:h-10 lg:w-px" style="background-color:var(--color-border);"></div>
+                            <div>
+                                <div class="text-sm font-semibold mb-2" style="color:var(--color-text-primary);">识别区域</div>
+                                <div class="flex flex-wrap gap-2">
+                                    <button class="region-btn px-3 py-1.5 rounded-lg text-sm transition-all" data-region="tasklist" onclick="selectRegion('tasklist')" style="background-color:var(--color-bg-elevated);color:var(--color-primary);border:1px solid var(--color-border-glow);">
+                                        任务列表
+                                    </button>
+                                    <button class="region-btn px-3 py-1.5 rounded-lg text-sm transition-all" data-region="chat" onclick="selectRegion('chat')" style="background-color:var(--color-bg-card);color:var(--color-text-secondary);border:1px solid var(--color-border);">
+                                        对话区
+                                    </button>
+                                    <button class="region-btn px-3 py-1.5 rounded-lg text-sm transition-all" data-region="input" onclick="selectRegion('input')" style="background-color:var(--color-bg-card);color:var(--color-text-secondary);border:1px solid var(--color-border);">
+                                        输入框
+                                    </button>
+                                    <button class="region-btn px-3 py-1.5 rounded-lg text-sm transition-all" data-region="all" onclick="selectRegion('all')" style="background-color:var(--color-bg-card);color:var(--color-text-secondary);border:1px solid var(--color-border);">
+                                        全部
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="h-px lg:h-10 lg:w-px" style="background-color:var(--color-border);"></div>
+                            <div class="flex flex-col gap-2">
+                                <div class="flex items-center gap-2">
+                                    <i data-lucide="clock" style="width:14px;height:14px;color:var(--color-text-muted);"></i>
+                                    <span class="text-xs" style="color:var(--color-text-muted);">最近识别:</span>
+                                    <span class="text-xs font-mono" id="last-recognition-time" style="color:var(--color-text-primary);">16:42:15</span>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <i data-lucide="hash" style="width:14px;height:14px;color:var(--color-text-muted);"></i>
+                                    <span class="text-xs" style="color:var(--color-text-muted);">总识别次数:</span>
+                                    <span class="text-xs font-mono" id="total-recognition-count" style="color:var(--color-primary);">1,284</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ====== BOTTOM SECTION: Gaze History Timeline ====== -->
+                <section class="px-6 pt-3 pb-6">
+                    <h2 class="text-sm font-semibold mb-4 uppercase tracking-wider" style="color:var(--color-text-muted);font-family:var(--font-display);">
+                        观星历史 / Gaze History Timeline
+                    </h2>
+                    <div class="panel-card p-5 overflow-x-auto no-scrollbar">
+                        <div class="flex items-center gap-0 min-w-max">
+
+                            <!-- Event 1 -->
+                            <div class="flex flex-col items-center" style="min-width:140px;">
+                                <div class="flex items-center gap-2 mb-1">
+                                    <div class="timeline-dot" style="background-color:var(--color-status-nascent);"></div>
+                                    <div>
+                                        <p class="text-xs font-semibold" style="color:var(--color-text-primary);">新星诞生</p>
+                                        <p class="text-xs" style="color:var(--color-text-muted);">任务已创建</p>
+                                    </div>
+                                </div>
+                                <span class="font-mono text-xs" style="color:var(--color-text-muted);">14:22:10</span>
+                            </div>
+
+                            <div class="timeline-connector" style="background-color:var(--color-status-nascent);min-width:2rem;"></div>
+
+                            <!-- Event 2 -->
+                            <div class="flex flex-col items-center" style="min-width:140px;">
+                                <div class="flex items-center gap-2 mb-1">
+                                    <div class="timeline-dot" style="background-color:var(--color-status-orbiting);"></div>
+                                    <div>
+                                        <p class="text-xs font-semibold" style="color:var(--color-text-primary);">自动路由</p>
+                                        <p class="text-xs" style="color:var(--color-text-muted);">匹配到 Trae</p>
+                                    </div>
+                                </div>
+                                <span class="font-mono text-xs" style="color:var(--color-text-muted);">14:22:15</span>
+                            </div>
+
+                            <div class="timeline-connector" style="background-color:var(--color-status-orbiting);min-width:2rem;"></div>
+
+                            <!-- Event 3 -->
+                            <div class="flex flex-col items-center" style="min-width:140px;">
+                                <div class="flex items-center gap-2 mb-1">
+                                    <div class="timeline-dot" style="background-color:var(--color-status-orbiting);"></div>
+                                    <div>
+                                        <p class="text-xs font-semibold" style="color:var(--color-text-primary);">入轨</p>
+                                        <p class="text-xs" style="color:var(--color-text-muted);">指令已发送</p>
+                                    </div>
+                                </div>
+                                <span class="font-mono text-xs" style="color:var(--color-text-muted);">14:22:18</span>
+                            </div>
+
+                            <div class="timeline-connector" style="background-color:var(--color-status-orbiting);min-width:2rem;"></div>
+
+                            <!-- Event 4 -->
+                            <div class="flex flex-col items-center" style="min-width:140px;">
+                                <div class="flex items-center gap-2 mb-1">
+                                    <div class="timeline-dot" style="background-color:var(--color-status-shining);"></div>
+                                    <div>
+                                        <p class="text-xs font-semibold" style="color:var(--color-text-primary);">闪耀</p>
+                                        <p class="text-xs" style="color:var(--color-text-muted);">Agent 开始处理</p>
+                                    </div>
+                                </div>
+                                <span class="font-mono text-xs" style="color:var(--color-text-muted);">14:22:20</span>
+                            </div>
+
+                            <div class="timeline-connector" style="background-color:var(--color-status-shining);min-width:2rem;"></div>
+
+                            <!-- Event 5 -->
+                            <div class="flex flex-col items-center" style="min-width:140px;">
+                                <div class="flex items-center gap-2 mb-1">
+                                    <div class="timeline-dot" style="background-color:var(--color-primary);"></div>
+                                    <div>
+                                        <p class="text-xs font-semibold" style="color:var(--color-text-primary);">星辉</p>
+                                        <p class="text-xs" style="color:var(--color-text-muted);">收到输出 (第1段)</p>
+                                    </div>
+                                </div>
+                                <span class="font-mono text-xs" style="color:var(--color-text-muted);">14:25:02</span>
+                            </div>
+
+                            <div class="timeline-connector" style="background-color:var(--color-primary);min-width:2rem;"></div>
+
+                            <!-- Event 6 -->
+                            <div class="flex flex-col items-center" style="min-width:140px;">
+                                <div class="flex items-center gap-2 mb-1">
+                                    <div class="timeline-dot" style="background-color:var(--color-primary);"></div>
+                                    <div>
+                                        <p class="text-xs font-semibold" style="color:var(--color-text-primary);">星辉</p>
+                                        <p class="text-xs" style="color:var(--color-text-muted);">收到输出 (第2段)</p>
+                                    </div>
+                                </div>
+                                <span class="font-mono text-xs" style="color:var(--color-text-muted);">14:25:45</span>
+                            </div>
+
+                            <div class="timeline-connector" style="background-color:var(--color-status-shining);min-width:2rem;"></div>
+
+                            <!-- Event 7 (Current, pulsing) -->
+                            <div class="flex flex-col items-center" style="min-width:140px;">
+                                <div class="flex items-center gap-2 mb-1">
+                                    <div class="timeline-dot dot-pulsing" style="background-color:var(--color-status-shining);"></div>
+                                    <div>
+                                        <p class="text-xs font-semibold" style="color:var(--color-status-shining);">当前</p>
+                                        <p class="text-xs" style="color:var(--color-text-muted);">持续观星中...</p>
+                                    </div>
+                                </div>
+                                <span class="font-mono text-xs" style="color:var(--color-text-muted);">14:26:00</span>
+                            </div>
+
+                        </div>
+                    </div>
+                </section>
+
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Fullscreen Modal -->
+    <div id="fullscreen-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-8" style="background-color:rgba(0,0,0,0.9);">
+        <div class="relative w-full max-w-5xl h-full flex flex-col">
+            <div class="flex items-center justify-between mb-4">
+                <div class="flex items-center gap-3">
+                    <span class="w-2 h-2 rounded-full dot-pulsing" style="background-color:var(--color-status-shining);"></span>
+                    <h3 class="text-lg font-semibold" id="fullscreen-title" style="color:var(--color-text-primary);">全屏查看</h3>
+                </div>
+                <button onclick="closeFullscreen()" class="w-10 h-10 flex items-center justify-center rounded-lg transition-all" style="background-color:var(--color-bg-card);border:1px solid var(--color-border);cursor:pointer;">
+                    <i data-lucide="x" style="width:20px;height:20px;color:var(--color-text-secondary);"></i>
+                </button>
+            </div>
+            <div class="flex-1 rounded-xl overflow-hidden panel-card p-4">
+                <div id="fullscreen-content" class="w-full h-full flex items-center justify-center" style="background-color:var(--color-bg-deep);">
+                    <div class="text-center" style="color:var(--color-text-muted);">
+                        <i data-lucide="image" style="width:48px;height:48px;margin:0 auto 16px;opacity:0.5;"></i>
+                        <p>OCR 实时画面</p>
+                        <p class="text-sm mt-1">正在加载...</p>
+                    </div>
+                </div>
+            </div>
+            <div class="mt-4 flex items-center justify-between">
+                <div class="flex items-center gap-4 text-sm" style="color:var(--color-text-muted);">
+                    <span class="font-mono" id="fullscreen-confidence">置信度: 94.2%</span>
+                    <span class="font-mono" id="fullscreen-fps">FPS: 24</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button class="echo-btn">
+                        <i data-lucide="download" style="width:14px;height:14px;display:inline;vertical-align:middle;margin-right:4px;"></i>保存截图
+                    </button>
+                    <button class="echo-btn" style="border-color:var(--color-primary-muted);color:var(--color-primary);">
+                        <i data-lucide="copy" style="width:14px;height:14px;display:inline;vertical-align:middle;margin-right:4px;"></i>复制文本
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>lucide.createIcons();</script>
+    <script>
+    let currentStarId = null;
+    let ocrStreamActive = false;
+    let logPanelOpen = false;
+    let currentSource = 'ocr';
+
+    async function loadStars() {
+      try {
+        const res = await starApi.list();
+        const stars = res.stars || [];
+        const selector = document.getElementById('star-selector');
+        
+        if (stars.length === 0) {
+          selector.innerHTML = '<option value="">暂无星体</option>';
+          return;
+        }
+        
+        selector.innerHTML = stars.map(star => 
+          `<option value="${star.pid}">${escapeHtml(star.title || star.star_type)} (PID: ${star.pid})</option>`
+        ).join('');
+        
+        const savedId = appState.getSavedStarId();
+        if (savedId && stars.some(s => String(s.pid) === savedId)) {
+          selector.value = savedId;
+          currentStarId = savedId;
+        } else if (stars.length > 0) {
+          currentStarId = String(stars[0].pid);
+          selector.value = currentStarId;
+        }
+        
+        if (currentStarId) {
+          onStarChange(currentStarId);
+        }
+      } catch(e) {
+        console.warn('Load stars failed:', e);
+        showNotification('加载星体列表失败', 'error');
+        document.getElementById('star-selector').innerHTML = '<option value="">加载失败</option>';
+      }
+    }
+
+    function onStarChange(starId) {
+      currentStarId = starId;
+      appState.setSelectedStar({ pid: starId });
+      
+      if (ocrStreamActive) {
+        toggleOcrStream(false);
+      }
+      
+      updateSourceBadge('ocr');
+      loadRecentLogs();
+      
+      const star = { pid: starId };
+      appState.setSelectedStar(star);
+    }
+
+    function updateSourceBadge(source) {
+      currentSource = source;
+      const badge = document.getElementById('source-badge');
+      if (!badge) return;
+      
+      if (source === 'ocr') {
+        badge.style.backgroundColor = 'rgba(255,215,0,0.12)';
+        badge.style.color = 'var(--color-primary)';
+        badge.style.borderColor = 'var(--color-border-glow)';
+        badge.innerHTML = `
+          <i data-lucide="scan-eye" style="width:12px;height:12px;"></i>
+          来源: OCR
+        `;
+      } else {
+        badge.style.backgroundColor = 'rgba(102,187,106,0.12)';
+        badge.style.color = 'var(--color-status-shining)';
+        badge.style.borderColor = 'rgba(102,187,106,0.3)';
+        badge.innerHTML = `
+          <i data-lucide="file-text" style="width:12px;height:12px;"></i>
+          来源: 日志
+        `;
+      }
+      lucide.createIcons();
+    }
+
+    function toggleOcrStream(forceState) {
+      const btn = document.getElementById('ocr-stream-toggle');
+      if (!btn) return;
+      
+      const newState = forceState !== undefined ? forceState : !ocrStreamActive;
+      
+      if (newState) {
+        if (!currentStarId) {
+          showNotification('请先选择星体', 'warning');
+          return;
+        }
+        
+        connectOcrStream(currentStarId, {
+          onOpen: () => {
+            ocrStreamActive = true;
+            btn.style.backgroundColor = 'rgba(255,215,0,0.15)';
+            btn.style.color = 'var(--color-primary)';
+            btn.style.borderColor = 'var(--color-border-glow)';
+            updateSourceBadge('ocr');
+            showNotification('OCR 实时流已连接', 'success');
+          },
+          onOcrUpdate: (data) => {
+            updateOutputContent(data.text || data.content || '', 'ocr');
+          },
+          onClose: () => {
+            ocrStreamActive = false;
+            btn.style.backgroundColor = 'var(--color-bg-card)';
+            btn.style.color = 'var(--color-text-secondary)';
+            btn.style.borderColor = 'var(--color-border)';
+            showNotification('OCR 实时流已断开', 'info');
+          }
+        });
+      } else {
+        disconnectOcrStream();
+        ocrStreamActive = false;
+        btn.style.backgroundColor = 'var(--color-bg-card)';
+        btn.style.color = 'var(--color-text-secondary)';
+        btn.style.borderColor = 'var(--color-border)';
+      }
+    }
+
+    function updateOutputContent(text, source) {
+      const outputEl = document.getElementById('starlight-output');
+      if (!outputEl) return;
+      
+      const lines = text.split('\n');
+      const lineNums = lines.map((_, i) => i + 1).join('</div><div>');
+      
+      outputEl.innerHTML = `
+        <div class="flex gap-0">
+          <div class="code-line-num text-xs leading-6">
+            <div>${lineNums}</div>
+          </div>
+          <div class="flex-1 text-xs leading-6" style="white-space:pre;overflow-x:auto;">${escapeHtml(text)}</div>
+        </div>
+      `;
+      
+      if (source) {
+        updateSourceBadge(source);
+      }
+      
+      outputEl.scrollTop = outputEl.scrollHeight;
+    }
+
+    async function loadRecentLogs() {
+      if (!currentStarId) return;
+      
+      const contentEl = document.querySelector('#log-panel-content > div');
+      if (contentEl) {
+        contentEl.textContent = '加载日志中...';
+        contentEl.style.color = 'var(--color-text-muted)';
+      }
+      
+      try {
+        const res = await emissaryApi.logRecent(currentStarId, 50);
+        const logs = res.logs || res.lines || res.content || '';
+        const logText = Array.isArray(logs) ? logs.join('\n') : (logs || '暂无日志内容');
+        
+        if (contentEl) {
+          contentEl.textContent = logText;
+          contentEl.style.color = 'var(--color-text-secondary)';
+        }
+      } catch(e) {
+        console.warn('Load logs failed:', e);
+        if (contentEl) {
+          contentEl.textContent = '加载日志失败';
+          contentEl.style.color = 'var(--color-status-faded)';
+        }
+      }
+    }
+
+    function toggleLogPanel() {
+      const content = document.getElementById('log-panel-content');
+      const icon = document.getElementById('log-panel-icon');
+      const toggle = document.getElementById('log-panel-toggle');
+      
+      logPanelOpen = !logPanelOpen;
+      
+      if (logPanelOpen) {
+        content.classList.remove('hidden');
+        icon.style.transform = 'rotate(180deg)';
+        toggle.style.borderColor = 'var(--color-border-glow)';
+        toggle.style.color = 'var(--color-primary)';
+        if (currentStarId) {
+          loadRecentLogs();
+        }
+      } else {
+        content.classList.add('hidden');
+        icon.style.transform = 'rotate(0deg)';
+        toggle.style.borderColor = 'var(--color-border)';
+        toggle.style.color = 'var(--color-text-secondary)';
+      }
+    }
+
+    async function loadStarlightData() {
+      try {
+        const res = await novaApi.list();
+        const novas = res.novas || [];
+        
+        const streamContainer = document.querySelector('.flex.gap-4.overflow-x-auto');
+        if (streamContainer) {
+          const activeNovas = novas.filter(n => n.status === 'shining' || n.status === 'awaiting');
+          if (activeNovas.length === 0) {
+            streamContainer.innerHTML = '<div style="padding:20px;color:var(--color-text-muted);width:100%;text-align:center;">暂无活跃星辉流</div>';
+          } else {
+            streamContainer.innerHTML = activeNovas.map(nova => {
+              const isShining = nova.status === 'shining';
+              return `
+                <div class="panel-card ${isShining ? 'starlight-card-selected' : ''} p-4 flex-shrink-0" style="width:${isShining ? '380' : '320'}px;cursor:pointer;">
+                  <div class="flex items-center justify-between mb-3">
+                    <span class="font-mono text-sm" style="color:${isShining ? 'var(--color-text-gold)' : 'var(--color-text-secondary)'};">${escapeHtml(nova.id)}</span>
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs ${isShining ? 'badge-shining' : 'badge-awaiting'}">${isShining ? '闪耀中' : '待回响'}</span>
+                  </div>
+                  <p class="text-base mb-2 truncate" style="color:var(--color-text-primary);font-weight:600;">${escapeHtml(nova.title)}</p>
+                  <div class="flex items-center gap-3 mb-3 text-sm" style="color:var(--color-text-secondary);">
+                    <span>Star: <span style="color:var(--color-text-primary);">${escapeHtml(nova.assigned_star || '自动')}</span></span>
+                  </div>
+                  <div class="card-inner p-3 text-sm" style="color:var(--color-text-muted);max-height:72px;overflow:hidden;">
+                    <p style="color:var(--color-text-secondary);">${escapeHtml((nova.result_starlight || nova.starlight || '等待输出...').substring(0, 120))}</p>
+                  </div>
+                </div>
+              `;
+            }).join('');
+          }
+        }
+        
+        const reviewCount = document.querySelector('.font-mono[style*="rgba(255,215,0"]');
+        if (reviewCount) {
+          const awaiting = novas.filter(n => n.status === 'awaiting').length;
+          reviewCount.textContent = `待审查: ${awaiting}`;
+        }
+        
+      } catch(e) { console.warn('Starlight API load failed:', e); }
+    }
+
+    addNavListeners();
+
+    let controlOcrEnabled = true;
+    let recognitionInterval = 3;
+    let selectedRegion = 'tasklist';
+    let totalRecognitionCount = 1284;
+    let confidenceData = [];
+    let responseTimeData = [];
+    let fpsValue = 24;
+    let avgConfidence = 94.2;
+
+    function getConfidenceColor(confidence) {
+      if (confidence >= 0.9) return 'var(--color-status-shining)';
+      if (confidence >= 0.7) return 'var(--color-status-awaiting)';
+      return 'var(--color-status-faded)';
+    }
+
+    function getConfidenceTextColor(confidence) {
+      if (confidence >= 0.9) return 'var(--color-status-shining)';
+      if (confidence >= 0.7) return 'var(--color-status-awaiting)';
+      return 'var(--color-status-faded)';
+    }
+
+    function initHeatmap() {
+      const heatmap = document.getElementById('confidence-heatmap');
+      if (!heatmap) return;
+      
+      const regionNames = [
+        '左上-1', '上中-1', '右上-1', '左中-1', '中中-1', '右中-1',
+        '左上-2', '上中-2', '右上-2', '左中-2', '中中-2', '右中-2',
+        '左下-1', '下中-1', '右下-1', '左中-3', '中中-3', '右中-3',
+        '左下-2', '下中-2', '右下-2', '底部-1', '底部-2', '底部-3'
+      ];
+      
+      confidenceData = [];
+      for (let i = 0; i < 24; i++) {
+        const baseConfidence = 0.85 + Math.random() * 0.13;
+        confidenceData.push({
+          name: regionNames[i],
+          confidence: Math.round(baseConfidence * 100) / 100
+        });
+      }
+      
+      renderHeatmap();
+    }
+
+    function renderHeatmap() {
+      const heatmap = document.getElementById('confidence-heatmap');
+      if (!heatmap) return;
+      
+      heatmap.innerHTML = confidenceData.map((item, index) => {
+        const color = getConfidenceColor(item.confidence);
+        const opacity = 0.3 + item.confidence * 0.7;
+        return `
+          <div class="aspect-square rounded-md cursor-pointer transition-all hover:scale-105 relative group"
+               style="background-color:${color};opacity:${opacity};"
+               title="${item.name}: ${(item.confidence * 100).toFixed(1)}%">
+            <div class="absolute inset-0 flex items-center justify-center text-xs font-mono opacity-0 group-hover:opacity-100 transition-opacity"
+                 style="color:var(--color-bg-deep);font-weight:700;">
+              ${(item.confidence * 100).toFixed(0)}%
+            </div>
+          </div>
+        `;
+      }).join('');
+      
+      const avg = confidenceData.reduce((sum, item) => sum + item.confidence, 0) / confidenceData.length;
+      avgConfidence = Math.round(avg * 1000) / 10;
+      const avgEl = document.getElementById('heatmap-avg');
+      if (avgEl) {
+        avgEl.textContent = `平均: ${avgConfidence.toFixed(1)}%`;
+        avgEl.style.color = getConfidenceTextColor(avg);
+      }
+      
+      const statConfidence = document.getElementById('stat-avg-confidence');
+      if (statConfidence) {
+        statConfidence.textContent = `${avgConfidence.toFixed(1)}%`;
+        statConfidence.style.color = getConfidenceTextColor(avg);
+      }
+    }
+
+    function updateHeatmap() {
+      confidenceData.forEach(item => {
+        const change = (Math.random() - 0.5) * 0.05;
+        item.confidence = Math.max(0.5, Math.min(0.99, item.confidence + change));
+      });
+      renderHeatmap();
+    }
+
+    function initResponseTimeline() {
+      responseTimeData = [];
+      const now = Date.now();
+      for (let i = 9; i >= 0; i--) {
+        responseTimeData.push({
+          time: now - i * 3000,
+          duration: 60 + Math.random() * 120
+        });
+      }
+      renderResponseTimeline();
+    }
+
+    function renderResponseTimeline() {
+      const timeline = document.getElementById('response-timeline');
+      if (!timeline) return;
+      
+      const maxDuration = Math.max(...responseTimeData.map(d => d.duration), 200);
+      
+      timeline.innerHTML = responseTimeData.map((item, index) => {
+        const heightPercent = (item.duration / maxDuration) * 100;
+        let color;
+        if (item.duration < 100) color = 'var(--color-status-shining)';
+        else if (item.duration < 200) color = 'var(--color-status-awaiting)';
+        else color = 'var(--color-status-faded)';
+        
+        const timeStr = new Date(item.time).toLocaleTimeString('zh-CN', { hour12: false });
+        
+        return `
+          <div class="flex-1 flex flex-col items-center justify-end h-full group cursor-pointer" title="${timeStr} - ${item.duration.toFixed(0)}ms">
+            <div class="w-full rounded-t transition-all hover:opacity-80" 
+                 style="height:${heightPercent}%;background-color:${color};min-height:4px;">
+            </div>
+          </div>
+        `;
+      }).join('');
+      
+      const avg = responseTimeData.reduce((sum, item) => sum + item.duration, 0) / responseTimeData.length;
+      const avgEl = document.getElementById('timeline-avg');
+      if (avgEl) {
+        avgEl.textContent = `平均: ${avg.toFixed(0)}ms`;
+        if (avg < 100) avgEl.style.color = 'var(--color-status-shining)';
+        else if (avg < 200) avgEl.style.color = 'var(--color-status-awaiting)';
+        else avgEl.style.color = 'var(--color-status-faded)';
+      }
+    }
+
+    function addResponseTime() {
+      const now = Date.now();
+      const duration = 60 + Math.random() * 120;
+      responseTimeData.push({ time: now, duration });
+      if (responseTimeData.length > 10) {
+        responseTimeData.shift();
+      }
+      renderResponseTimeline();
+      
+      totalRecognitionCount++;
+      const totalEl = document.getElementById('total-recognition-count');
+      if (totalEl) {
+        totalEl.textContent = totalRecognitionCount.toLocaleString();
+      }
+      
+      const lastTimeEl = document.getElementById('last-recognition-time');
+      if (lastTimeEl) {
+        lastTimeEl.textContent = new Date(now).toLocaleTimeString('zh-CN', { hour12: false });
+      }
+      
+      fpsValue = Math.round(20 + Math.random() * 10);
+      const fpsEl = document.getElementById('stat-fps');
+      if (fpsEl) {
+        fpsEl.textContent = fpsValue;
+        fpsEl.style.color = fpsValue >= 20 ? 'var(--color-status-shining)' : 'var(--color-status-faded)';
+      }
+    }
+
+    function openFullscreen(streamId) {
+      const modal = document.getElementById('fullscreen-modal');
+      if (!modal) return;
+      
+      const titleEl = document.getElementById('fullscreen-title');
+      if (titleEl) {
+        titleEl.textContent = `全屏查看 - ${streamId}`;
+      }
+      
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+      lucide.createIcons();
+    }
+
+    function closeFullscreen() {
+      const modal = document.getElementById('fullscreen-modal');
+      if (!modal) return;
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }
+
+    function toggleControlOcr() {
+      controlOcrEnabled = !controlOcrEnabled;
+      const toggle = document.getElementById('control-ocr-toggle');
+      const knob = document.getElementById('control-ocr-knob');
+      
+      if (toggle && knob) {
+        if (controlOcrEnabled) {
+          toggle.style.backgroundColor = 'var(--color-status-shining)';
+          knob.style.right = '0.125rem';
+          knob.style.left = 'auto';
+          if (currentStarId && !ocrStreamActive) {
+            toggleOcrStream(true);
+          }
+        } else {
+          toggle.style.backgroundColor = 'var(--color-bg-elevated)';
+          knob.style.left = '0.125rem';
+          knob.style.right = 'auto';
+          if (ocrStreamActive) {
+            toggleOcrStream(false);
+          }
+        }
+      }
+    }
+
+    function updateInterval(value) {
+      recognitionInterval = parseInt(value);
+      const valueEl = document.getElementById('interval-value');
+      if (valueEl) {
+        valueEl.textContent = `${recognitionInterval} 秒`;
+      }
+    }
+
+    function selectRegion(region) {
+      selectedRegion = region;
+      const buttons = document.querySelectorAll('.region-btn');
+      buttons.forEach(btn => {
+        const btnRegion = btn.getAttribute('data-region');
+        if (btnRegion === region) {
+          btn.style.backgroundColor = 'var(--color-bg-elevated)';
+          btn.style.color = 'var(--color-primary)';
+          btn.style.borderColor = 'var(--color-border-glow)';
+        } else {
+          btn.style.backgroundColor = 'var(--color-bg-card)';
+          btn.style.color = 'var(--color-text-secondary)';
+          btn.style.borderColor = 'var(--color-border)';
+        }
+      });
+    }
+
+    let simulationInterval = null;
+    function startSimulation() {
+      if (simulationInterval) return;
+      simulationInterval = setInterval(() => {
+        if (controlOcrEnabled) {
+          updateHeatmap();
+          addResponseTime();
+        }
+      }, 3000);
+    }
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        closeFullscreen();
+      }
+    });
+
+    document.addEventListener('DOMContentLoaded', () => {
+      loadStars();
+      loadStarlightData();
+      initHeatmap();
+      initResponseTimeline();
+      startSimulation();
+      
+      const starSelector = document.getElementById('star-selector');
+      if (starSelector) {
+        starSelector.addEventListener('change', (e) => {
+          onStarChange(e.target.value);
+        });
+      }
+      
+      const ocrToggle = document.getElementById('ocr-stream-toggle');
+      if (ocrToggle) {
+        ocrToggle.addEventListener('click', () => toggleOcrStream());
+      }
+      
+      const logToggle = document.getElementById('log-panel-toggle');
+      if (logToggle) {
+        logToggle.addEventListener('click', toggleLogPanel);
+      }
+      
+      const modal = document.getElementById('fullscreen-modal');
+      if (modal) {
+        modal.addEventListener('click', (e) => {
+          if (e.target === modal) {
+            closeFullscreen();
+          }
+        });
+      }
+    });
+    </script>
+</body>
+</html>

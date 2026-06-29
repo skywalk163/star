@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>星群状态总览 — 群星 Star</title>
+    <style id="theme-vars">
+:root {
+  --color-bg-deep: #0a0e27;
+  --color-bg-panel: #1a1f3a;
+  --color-bg-card: #151934;
+  --color-bg-elevated: #212647;
+  --color-bg-hover: #2a3058;
+  --color-primary: #ffd700;
+  --color-primary-dim: rgba(255, 215, 0, 0.15);
+  --color-primary-muted: rgba(255, 215, 0, 0.6);
+  --color-primary-glow: rgba(255, 215, 0, 0.25);
+  --color-success: #10b981;
+  --color-warning: #f59e0b;
+  --color-danger: #ef4444;
+  --color-info: #3b82f6;
+  --color-text-primary: #e8eaf6;
+  --color-text-secondary: #9fa8da;
+  --color-text-muted: #616885;
+  --color-text-gold: #ffd700;
+  --color-border: rgba(255, 255, 255, 0.08);
+  --color-border-glow: rgba(255, 215, 0, 0.2);
+  --font-display: 'Inter', 'Noto Sans SC', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --space-sm: 8px;
+  --space-md: 12px;
+  --space-lg: 16px;
+  --space-xl: 24px;
+}
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.3.1/dist/index.global.js"></script>
+    <script src="https://unpkg.com/lucide@1.8.0/dist/umd/lucide.min.js"></script>
+    <script src="/ui/js/api-bridge.js"></script>
+    <style>
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body {
+        background: var(--color-bg-deep);
+        color: var(--color-text-primary);
+        font-family: var(--font-display);
+        min-height: 100vh;
+      }
+
+      .page-header {
+        background: var(--color-bg-panel);
+        border-bottom: 1px solid var(--color-border);
+        padding: var(--space-lg) var(--space-xl);
+      }
+      .page-title {
+        font-size: 20px;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .page-title .icon {
+        color: var(--color-primary);
+      }
+      .page-subtitle {
+        font-size: 13px;
+        color: var(--color-text-muted);
+        margin-top: 4px;
+      }
+
+      .main-content {
+        padding: var(--space-xl);
+        max-width: 1400px;
+        margin: 0 auto;
+      }
+
+      /* Summary Cards */
+      .summary-cards {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: var(--space-lg);
+        margin-bottom: var(--space-xl);
+      }
+      .summary-card {
+        background: var(--color-bg-card);
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius-lg);
+        padding: var(--space-lg);
+        display: flex;
+        align-items: center;
+        gap: var(--space-md);
+      }
+      .summary-card .icon-wrap {
+        width: 48px;
+        height: 48px;
+        border-radius: var(--radius-md);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 24px;
+      }
+      .summary-card .icon-wrap.total { background: var(--color-primary-dim); color: var(--color-primary); }
+      .summary-card .icon-wrap.working { background: rgba(239, 68, 68, 0.15); color: #ef4444; }
+      .summary-card .icon-wrap.idle { background: rgba(59, 130, 246, 0.15); color: #3b82f6; }
+      .summary-card .icon-wrap.completed { background: rgba(16, 185, 129, 0.15); color: #10b981; }
+      .summary-card .info { flex: 1; }
+      .summary-card .number {
+        font-size: 28px;
+        font-weight: 700;
+        line-height: 1;
+      }
+      .summary-card .label {
+        font-size: 12px;
+        color: var(--color-text-muted);
+        margin-top: 4px;
+      }
+
+      /* Star Grid */
+      .stars-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+        gap: var(--space-lg);
+      }
+
+      /* Star Card */
+      .star-card {
+        background: var(--color-bg-card);
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius-lg);
+        overflow: hidden;
+        transition: all 0.3s;
+      }
+      .star-card:hover {
+        border-color: var(--color-border-glow);
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+      }
+      .star-card.working {
+        border-left: 3px solid #ef4444;
+      }
+      .star-card.idle {
+        border-left: 3px solid #3b82f6;
+      }
+      .star-card.completed {
+        border-left: 3px solid #10b981;
+      }
+      .star-card-header {
+        padding: var(--space-lg);
+        border-bottom: 1px solid var(--color-border);
+        display: flex;
+        align-items: center;
+        gap: var(--space-md);
+      }
+      .star-status-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        flex-shrink: 0;
+      }
+      .star-status-dot.working {
+        background: #ef4444;
+        box-shadow: 0 0 8px #ef4444;
+        animation: pulse 2s infinite;
+      }
+      .star-status-dot.idle {
+        background: #3b82f6;
+      }
+      .star-status-dot.completed {
+        background: #10b981;
+      }
+      .star-status-dot.unknown {
+        background: #6b7280;
+      }
+      @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.5; }
+      }
+      .star-title {
+        flex: 1;
+        min-width: 0;
+      }
+      .star-name {
+        font-size: 15px;
+        font-weight: 600;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .star-type {
+        font-size: 11px;
+        color: var(--color-text-muted);
+        font-family: var(--font-mono);
+      }
+      .star-status-badge {
+        padding: 4px 10px;
+        border-radius: 20px;
+        font-size: 11px;
+        font-weight: 500;
+      }
+      .star-status-badge.working {
+        background: rgba(239, 68, 68, 0.15);
+        color: #ef4444;
+      }
+      .star-status-badge.idle {
+        background: rgba(59, 130, 246, 0.15);
+        color: #3b82f6;
+      }
+      .star-status-badge.completed {
+        background: rgba(16, 185, 129, 0.15);
+        color: #10b981;
+      }
+      .star-status-badge.unknown {
+        background: rgba(107, 114, 128, 0.15);
+        color: #9ca3af;
+      }
+
+      .star-card-body {
+        padding: var(--space-lg);
+      }
+      .star-info-row {
+        display: flex;
+        align-items: center;
+        gap: var(--space-md);
+        font-size: 12px;
+        color: var(--color-text-secondary);
+        margin-bottom: var(--space-md);
+      }
+      .star-info-row .label {
+        color: var(--color-text-muted);
+        min-width: 50px;
+      }
+      .star-info-row .value {
+        font-family: var(--font-mono);
+      }
+
+      /* Task Preview */
+      .task-preview {
+        background: var(--color-bg-elevated);
+        border-radius: var(--radius-md);
+        padding: var(--space-md);
+        margin-top: var(--space-md);
+      }
+      .task-preview .label {
+        font-size: 11px;
+        color: var(--color-text-muted);
+        margin-bottom: 6px;
+      }
+      .task-preview .text {
+        font-size: 13px;
+        color: var(--color-text-secondary);
+        line-height: 1.5;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+      }
+
+      /* Windows List */
+      .windows-section {
+        margin-top: var(--space-md);
+        border-top: 1px solid var(--color-border);
+        padding-top: var(--space-md);
+      }
+      .windows-header {
+        font-size: 11px;
+        color: var(--color-text-muted);
+        margin-bottom: var(--space-sm);
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .window-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 10px;
+        background: var(--color-bg-elevated);
+        border-radius: 6px;
+        font-size: 12px;
+        color: var(--color-text-secondary);
+        margin-right: 6px;
+        margin-bottom: 6px;
+      }
+      .window-chip .status-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+      }
+      .window-chip .status-dot.working { background: #ef4444; }
+      .window-chip .status-dot.idle { background: #3b82f6; }
+      .window-chip .status-dot.completed { background: #10b981; }
+      .window-chip .status-dot.unknown { background: #6b7280; }
+
+      /* Action Buttons */
+      .star-actions {
+        display: flex;
+        gap: var(--space-sm);
+        padding: var(--space-md) var(--space-lg);
+        border-top: 1px solid var(--color-border);
+        background: var(--color-bg-panel);
+      }
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        padding: 8px 14px;
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius-md);
+        background: var(--color-bg-elevated);
+        color: var(--color-text-primary);
+        font-size: 12px;
+        cursor: pointer;
+        transition: all 0.2s;
+        text-decoration: none;
+      }
+      .btn:hover {
+        background: var(--color-bg-hover);
+        border-color: var(--color-border-glow);
+      }
+      .btn-primary {
+        background: var(--color-primary);
+        color: #1a1f3a;
+        border-color: var(--color-primary);
+        font-weight: 500;
+      }
+      .btn-primary:hover { opacity: 0.9; }
+      .btn-sm { padding: 5px 10px; font-size: 11px; }
+
+      /* Empty State */
+      .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+        color: var(--color-text-muted);
+      }
+      .empty-state .icon { font-size: 48px; margin-bottom: 16px; opacity: 0.5; }
+      .empty-state .text { font-size: 14px; }
+
+      /* Refresh indicator */
+      .refresh-indicator {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 12px;
+        color: var(--color-text-muted);
+      }
+      .refresh-indicator .spinner {
+        width: 14px;
+        height: 14px;
+        border: 2px solid var(--color-border);
+        border-top-color: var(--color-primary);
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+      }
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+
+      /* Last update time */
+      .last-update {
+        font-size: 12px;
+        color: var(--color-text-muted);
+        text-align: center;
+        margin-top: var(--space-xl);
+      }
+    </style>
+</head>
+<body>
+    <div class="page-header">
+        <div class="page-title">
+            <i data-icon="star" class="icon"></i>
+            <span>星群状态总览</span>
+        </div>
+        <div class="page-subtitle">
+            一目了然 · 掌控所有 AI Agent 运行状态
+        </div>
+    </div>
+
+    <div class="main-content">
+        <!-- Summary Cards -->
+        <div class="summary-cards" id="summaryCards">
+            <div class="summary-card">
+                <div class="icon-wrap total">
+                    <i data-icon="stars"></i>
+                </div>
+                <div class="info">
+                    <div class="number" id="totalCount">-</div>
+                    <div class="label">AI 助手总数</div>
+                </div>
+            </div>
+            <div class="summary-card">
+                <div class="icon-wrap working">
+                    <i data-icon="zap"></i>
+                </div>
+                <div class="info">
+                    <div class="number" id="workingCount">-</div>
+                    <div class="label">工作中</div>
+                </div>
+            </div>
+            <div class="summary-card">
+                <div class="icon-wrap idle">
+                    <i data-icon="coffee"></i>
+                </div>
+                <div class="info">
+                    <div class="number" id="idleCount">-</div>
+                    <div class="label">空闲等待</div>
+                </div>
+            </div>
+            <div class="summary-card">
+                <div class="icon-wrap completed">
+                    <i data-icon="check-circle"></i>
+                </div>
+                <div class="info">
+                    <div class="number" id="completedCount">-</div>
+                    <div class="label">任务完成</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Stars Grid -->
+        <div class="stars-grid" id="starsGrid">
+            <div class="empty-state" id="emptyState">
+                <div class="icon">
+                    <i data-icon="star"></i>
+                </div>
+                <div class="text">正在扫描 AI 助手...</div>
+            </div>
+        </div>
+
+        <!-- Last Update -->
+        <div class="last-update" id="lastUpdate">
+            最后更新: -
+        </div>
+    </div>
+
+    <script>
+        // Initialize Lucide icons
+        if (typeof lucide !== 'undefined') {
+            lucide.createIcons();
+        }
+
+        // State
+        let refreshInterval = null;
+        let lastData = null;
+
+        // Fetch stars status
+        async function fetchStarsStatus() {
+            try {
+                const resp = await fetch('/api/remote/stars/status');
+                const data = await resp.json();
+
+                if (data.success) {
+                    lastData = data;
+                    renderStarsStatus(data);
+                }
+            } catch (err) {
+                console.error('Failed to fetch stars status:', err);
+                document.getElementById('starsGrid').innerHTML = `
+                    <div class="empty-state">
+                        <div class="icon"><i data-icon="alert-circle"></i></div>
+                        <div class="text">无法连接到服务器</div>
+                    </div>
+                `;
+                if (typeof lucide !== 'undefined') lucide.createIcons();
+            }
+        }
+
+        // Render stars status
+        function renderStarsStatus(data) {
+            const summary = data.summary || {};
+            const stars = data.stars || [];
+
+            // Update summary cards
+            document.getElementById('totalCount').textContent = summary.total_stars || 0;
+            document.getElementById('workingCount').textContent = summary.working || 0;
+            document.getElementById('idleCount').textContent = summary.idle || 0;
+            document.getElementById('completedCount').textContent = summary.completed || 0;
+
+            // Update last update time
+            const updateTime = new Date(data.timestamp);
+            document.getElementById('lastUpdate').textContent =
+                `最后更新: ${updateTime.toLocaleTimeString()}`;
+
+            // Render star cards
+            if (stars.length === 0) {
+                document.getElementById('starsGrid').innerHTML = `
+                    <div class="empty-state">
+                        <div class="icon"><i data-icon="star"></i></div>
+                        <div class="text">未发现运行的 AI 助手</div>
+                    </div>
+                `;
+                if (typeof lucide !== 'undefined') lucide.createIcons();
+                return;
+            }
+
+            const grid = document.getElementById('starsGrid');
+            grid.innerHTML = stars.map(star => {
+                const statusClass = star.overall_status || 'unknown';
+                const statusText = {
+                    'working': '工作中',
+                    'idle': '空闲',
+                    'completed': '已完成',
+                    'unknown': '未知'
+                }[statusClass] || '未知';
+
+                // Get the main window info
+                const mainWindow = star.windows && star.windows[0];
+                const taskPreview = mainWindow && mainWindow.current_task;
+
+                return `
+                <div class="star-card ${statusClass}">
+                    <div class="star-card-header">
+                        <div class="star-status-dot ${statusClass}"></div>
+                        <div class="star-title">
+                            <div class="star-name">${star.description || star.star_type}</div>
+                            <div class="star-type">${star.star_type} · PID ${star.pid}</div>
+                        </div>
+                        <div class="star-status-badge ${statusClass}">${statusText}</div>
+                    </div>
+                    <div class="star-card-body">
+                        <div class="star-info-row">
+                            <span class="label">窗口</span>
+                            <span class="value">${star.window_count} 个窗口</span>
+                        </div>
+                        <div class="star-info-row">
+                            <span class="label">标题</span>
+                            <span class="value" title="${star.title}">${truncate(star.title, 40)}</span>
+                        </div>
+                        ${taskPreview ? `
+                        <div class="task-preview">
+                            <div class="label">当前任务</div>
+                            <div class="text">${escapeHtml(taskPreview)}</div>
+                        </div>
+                        ` : ''}
+                        ${star.windows && star.windows.length > 1 ? `
+                        <div class="windows-section">
+                            <div class="windows-header">
+                                <i data-icon="layers" style="width:12px;height:12px;"></i>
+                                所有窗口
+                            </div>
+                            ${star.windows.map(w => `
+                                <span class="window-chip">
+                                    <span class="status-dot ${w.status_category || 'unknown'}"></span>
+                                    ${truncate(w.title, 25)}
+                                </span>
+                            `).join('')}
+                        </div>
+                        ` : ''}
+                    </div>
+                    <div class="star-actions">
+                        <a href="/ui/remote?hwnd=${mainWindow ? mainWindow.hwnd : ''}" class="btn btn-sm">
+                            <i data-icon="monitor" style="width:12px;height:12px;"></i>
+                            查看控制
+                        </a>
+                        <button class="btn btn-sm" onclick="focusWindow(${mainWindow ? mainWindow.hwnd : 0})">
+                            <i data-icon="maximize-2" style="width:12px;height:12px;"></i>
+                            激活窗口
+                        </button>
+                    </div>
+                </div>
+                `;
+            }).join('');
+
+            // Re-initialize icons
+            if (typeof lucide !== 'undefined') lucide.createIcons();
+        }
+
+        // Helper: truncate text
+        function truncate(text, maxLen) {
+            if (!text) return '';
+            return text.length > maxLen ? text.substring(0, maxLen) + '...' : text;
+        }
+
+        // Helper: escape HTML
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Focus window
+        async function focusWindow(hwnd) {
+            if (!hwnd) return;
+            try {
+                await fetch(`/api/remote/click/${hwnd}?x_ratio=0.5&y_ratio=0.5`, {
+                    method: 'POST'
+                });
+            } catch (err) {
+                console.error('Failed to focus window:', err);
+            }
+        }
+
+        // Auto refresh
+        function startAutoRefresh() {
+            if (refreshInterval) clearInterval(refreshInterval);
+            refreshInterval = setInterval(fetchStarsStatus, 10000); // Refresh every 10 seconds
+        }
+
+        // Initial load
+        fetchStarsStatus();
+        startAutoRefresh();
+    </script>
+</body>
+</html>

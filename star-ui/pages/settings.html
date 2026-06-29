@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>系统配置 — 群星 Star</title>
+    <style id="theme-vars">
+:root {
+  --color-bg-deep: #0a0e27;
+  --color-bg-panel: #1a1f3a;
+  --color-bg-card: #151934;
+  --color-bg-elevated: #212647;
+  --color-bg-hover: #2a3058;
+  --color-primary: #ffd700;
+  --color-primary-dim: rgba(255, 215, 0, 0.15);
+  --color-primary-muted: rgba(255, 215, 0, 0.6);
+  --color-primary-glow: rgba(255, 215, 0, 0.25);
+  --color-star-supernova: #ffffff;
+  --color-star-bright: #4fc3f7;
+  --color-star-normal: #b0bec5;
+  --color-star-dim: #616161;
+  --color-status-shining: #66bb6a;
+  --color-status-awaiting: #ffa726;
+  --color-status-faded: #ef5350;
+  --color-status-nascent: #ab47bc;
+  --color-status-orbiting: #42a5f5;
+  --color-status-constellated: #ffd700;
+  --color-status-darkened: #455a64;
+  --state-success: #66bb6a;
+  --state-warning: #ffa726;
+  --state-error: #ef5350;
+  --state-info: #42a5f5;
+  --color-text-primary: #e8eaf6;
+  --color-text-secondary: #9fa8da;
+  --color-text-muted: #616885;
+  --color-text-gold: #ffd700;
+  --color-border: rgba(255, 255, 255, 0.08);
+  --color-border-subtle: rgba(255, 255, 255, 0.04);
+  --color-border-glow: rgba(255, 215, 0, 0.2);
+  --surface-1: #0a0e27;
+  --surface-2: #1a1f3a;
+  --surface-3: #212647;
+  --surface-4: #2a3058;
+  --font-display: 'Inter', 'Noto Sans SC', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+  --font-body: var(--font-display);
+  --text-xs: 0.75rem;
+  --text-sm: 0.8125rem;
+  --text-base: 0.875rem;
+  --text-lg: 1rem;
+  --text-xl: 1.125rem;
+  --text-2xl: 1.5rem;
+  --text-3xl: 1.875rem;
+  --text-4xl: 2.25rem;
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-full: 9999px;
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 12px;
+  --space-lg: 16px;
+  --space-xl: 24px;
+  --space-2xl: 32px;
+  --space-3xl: 48px;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.05);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.15);
+  --shadow-glow: 0 0 20px rgba(255, 215, 0, 0.15);
+  --transition-fast: 150ms ease;
+  --transition-normal: 250ms ease;
+  --transition-slow: 400ms ease;
+}
+.font-display { font-family: var(--font-display); }
+.font-mono { font-family: var(--font-mono); }
+.font-body { font-family: var(--font-body); }
+.text-xs { font-size: var(--text-xs); }
+.text-sm { font-size: var(--text-sm); }
+.text-base { font-size: var(--text-base); }
+.text-lg { font-size: var(--text-lg); }
+.text-xl { font-size: var(--text-xl); }
+.text-2xl { font-size: var(--text-2xl); }
+.text-3xl { font-size: var(--text-3xl); }
+.text-4xl { font-size: var(--text-4xl); }
+.text-primary { color: var(--color-text-primary); }
+.text-secondary { color: var(--color-text-secondary); }
+.text-muted { color: var(--color-text-muted); }
+.text-gold { color: var(--color-text-gold); }
+.bg-deep { background-color: var(--color-bg-deep); }
+.bg-panel { background-color: var(--color-bg-panel); }
+.bg-card { background-color: var(--color-bg-card); }
+.bg-elevated { background-color: var(--color-bg-elevated); }
+.bg-hover { background-color: var(--color-bg-hover); }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.3.1/dist/index.global.js"></script>
+    <script src="https://unpkg.com/lucide@1.8.0/dist/umd/lucide.min.js"></script>
+    <script src="/ui/js/api-bridge.js"></script>
+    <script src="/ui/js/nav.js"></script>
+    <script src="/ui/js/onboarding.js"></script>
+    <style type="text/tailwindcss">
+  @theme inline {
+    --color-primary: var(--color-primary);
+    --color-border: var(--color-border);
+  }
+  @layer base {
+    body { background: var(--color-background); color: var(--color-text-primary); }
+    td, th { @apply break-words; word-break: break-all; word-break: auto-phrase; }
+    th { @apply whitespace-nowrap; }
+  }
+    </style>
+    <style>
+      .no-scrollbar::-webkit-scrollbar { display: none; }
+      .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      [data-icon] {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        -webkit-mask-size: contain;
+        mask-size: contain;
+        -webkit-mask-repeat: no-repeat;
+        mask-repeat: no-repeat;
+        -webkit-mask-position: center;
+        mask-position: center;
+        background-color: currentColor;
+      }
+    </style>
+</head>
+<body class="min-h-screen font-sans antialiased overflow-hidden" style="background:var(--color-bg-deep);color:var(--color-text-primary);font-family:var(--font-body);">
+    <main class="flex h-screen">
+
+      <!-- ===== SIDEBAR ===== -->
+      <aside class="flex flex-col items-center w-[60px] shrink-0 border-r" style="background:var(--color-bg-panel);border-color:var(--color-border);">
+        <div class="flex items-center justify-center w-full h-[56px] border-b" style="border-color:var(--color-border);">
+          <span class="text-2xl font-bold" style="color:#ffd700;">&#9733;</span>
+        </div>
+        <nav class="flex flex-col items-center flex-1 pt-3 gap-1">
+          <a href="#" title="Star Map" data-dom-id="nav-starmap"
+             class="relative flex items-center justify-center w-10 h-10 transition-all duration-200"
+             style="color:var(--color-text-muted);border-left:3px solid transparent;">
+            <i data-lucide="sparkles" class="w-5 h-5"></i>
+          </a>
+          <a href="#" title="Orbit Console" data-dom-id="nav-orbit"
+             class="relative flex items-center justify-center w-10 h-10 transition-all duration-200"
+             style="color:var(--color-text-muted);border-left:3px solid transparent;">
+            <i data-lucide="orbit" class="w-5 h-5"></i>
+          </a>
+          <a href="#" title="Starlight Review" data-dom-id="nav-starlight"
+             class="relative flex items-center justify-center w-10 h-10 transition-all duration-200"
+             style="color:var(--color-text-muted);border-left:3px solid transparent;">
+            <i data-lucide="scan-eye" class="w-5 h-5"></i>
+          </a>
+        </nav>
+        <div class="flex flex-col items-center pb-4 gap-1">
+          <a href="#" title="Settings" data-dom-id="nav-settings"
+             class="flex items-center justify-center w-10 h-10 transition-all duration-200"
+             style="background:var(--color-primary-dim);color:#ffd700;border-left:3px solid #ffd700;border-radius:0 8px 8px 0;">
+            <i data-lucide="settings" class="w-5 h-5"></i>
+          </a>
+        </div>
+      </aside>
+
+      <!-- ===== MAIN AREA ===== -->
+      <div class="flex flex-col flex-1 min-w-0">
+
+        <!-- ===== TOP HEADER BAR ===== -->
+        <header class="flex items-center justify-between shrink-0 px-6 h-[56px] border-b"
+                style="background:var(--color-bg-panel);border-color:var(--color-border);">
+          <div class="flex items-center gap-3 min-w-0">
+            <h1 class="text-lg font-semibold whitespace-nowrap" style="color:var(--color-text-primary);">系统配置 / Settings</h1>
+            <span class="text-sm whitespace-nowrap" style="color:var(--color-text-muted);">群星 Star &gt; 配置</span>
+          </div>
+          <div class="flex items-center gap-4 shrink-0">
+            <div class="relative group flex items-center gap-2 px-3 py-1.5 rounded-lg cursor-default" style="background:var(--color-bg-card);">
+              <span class="w-2 h-2 rounded-full shrink-0" id="status-dot" style="background:var(--color-status-shining);box-shadow:0 0 6px var(--color-status-shining);"></span>
+              <span class="text-sm whitespace-nowrap" id="status-text" style="color:var(--color-text-secondary);">已连接</span>
+            </div>
+          </div>
+        </header>
+
+        <!-- ===== CONTENT BODY (scrollable) ===== -->
+        <div class="flex-1 overflow-y-auto p-4 lg:p-6" style="background:var(--color-bg-deep);">
+
+          <div class="max-w-4xl mx-auto">
+
+            <!-- Tab Navigation -->
+            <div class="flex border-b mb-6 overflow-x-auto no-scrollbar" style="border-color:var(--color-border);">
+              <button class="settings-tab flex items-center gap-2 px-4 py-3 text-sm font-medium whitespace-nowrap transition-colors duration-200" data-tab="server" style="color:#ffd700;border-bottom:2px solid #ffd700;">
+                <i data-lucide="server" class="w-4 h-4"></i>
+                服务端配置
+              </button>
+              <button class="settings-tab flex items-center gap-2 px-4 py-3 text-sm font-medium whitespace-nowrap transition-colors duration-200" data-tab="ocr" style="color:var(--color-text-muted);border-bottom:2px solid transparent;">
+                <i data-lucide="scan-line" class="w-4 h-4"></i>
+                OCR 配置
+              </button>
+              <button class="settings-tab flex items-center gap-2 px-4 py-3 text-sm font-medium whitespace-nowrap transition-colors duration-200" data-tab="emissary" style="color:var(--color-text-muted);border-bottom:2px solid transparent;">
+                <i data-lucide="bot" class="w-4 h-4"></i>
+                星使配置
+              </button>
+              <button class="settings-tab flex items-center gap-2 px-4 py-3 text-sm font-medium whitespace-nowrap transition-colors duration-200" data-tab="logging" style="color:var(--color-text-muted);border-bottom:2px solid transparent;">
+                <i data-lucide="file-text" class="w-4 h-4"></i>
+                日志配置
+              </button>
+              <button class="settings-tab flex items-center gap-2 px-4 py-3 text-sm font-medium whitespace-nowrap transition-colors duration-200" data-tab="directories" style="color:var(--color-text-muted);border-bottom:2px solid transparent;">
+                <i data-lucide="folder" class="w-4 h-4"></i>
+                目录配置
+              </button>
+            </div>
+
+            <!-- Loading State -->
+            <div id="config-loading" class="flex items-center justify-center py-16" style="color:var(--color-text-muted);">
+              <i data-lucide="loader" class="w-6 h-6 animate-spin mr-3"></i>
+              <span>加载配置中…</span>
+            </div>
+
+            <!-- Config Form -->
+            <form id="config-form" class="hidden space-y-6">
+
+              <!-- Server Tab -->
+              <div class="settings-panel" data-panel="server">
+                <div class="rounded-lg border p-6 space-y-5" style="background:var(--color-bg-card);border-color:var(--color-border);">
+                  <div class="flex items-center gap-3 pb-3 border-b" style="border-color:var(--color-border);">
+                    <div class="flex items-center justify-center w-10 h-10 rounded-lg" style="background:var(--color-primary-dim);">
+                      <i data-lucide="server" class="w-5 h-5" style="color:#ffd700;"></i>
+                    </div>
+                    <div>
+                      <h2 class="text-base font-semibold" style="color:var(--color-text-primary);">服务端配置</h2>
+                      <p class="text-xs" style="color:var(--color-text-muted);">Star 服务运行参数</p>
+                    </div>
+                  </div>
+
+                  <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    <div class="space-y-2">
+                      <label class="text-sm font-medium" style="color:var(--color-text-secondary);">主机地址 (Host)</label>
+                      <input type="text" name="server.host"
+                             class="w-full px-3 py-2 text-sm rounded-lg border focus:outline-none transition-colors duration-200"
+                             style="background:var(--color-bg-panel);border-color:var(--color-border);color:var(--color-text-primary);"
+                             placeholder="0.0.0.0">
+                      <p class="text-xs" style="color:var(--color-text-muted);">服务监听的主机地址</p>
+                    </div>
+                    <div class="space-y-2">
+                      <label class="text-sm font-medium" style="color:var(--color-text-secondary);">端口 (Port)</label>
+                      <input type="number" name="server.port"
+                             class="w-full px-3 py-2 text-sm rounded-lg border focus:outline-none transition-colors duration-200"
+                             style="background:var(--color-bg-panel);border-color:var(--color-border);color:var(--color-text-primary);"
+                             placeholder="8767">
+                      <p class="text-xs" style="color:var(--color-text-muted);">HTTP 服务监听端口</p>
+                    </div>
+                  </div>
+
+                  <div class="space-y-2">
+                    <label class="text-sm font-medium" style="color:var(--color-text-secondary);">日志级别 (Log Level)</label>
+                    <select name="server.log_level"
+                            class="w-full px-3 py-2 text-sm rounded-lg border cursor-pointer focus:outline-none transition-colors duration-200"
+                            style="background:var(--color-bg-panel);border-color:var(--color-border);color:var(--color-text-primary);">
+                      <option value="debug">DEBUG - 详细调试信息</option>
+                      <option value="info">INFO - 一般信息（默认）</option>
+                      <option value="warning">WARNING - 警告信息</option>
+                      <option value="error">ERROR - 仅错误信息</option>
+                    </select>
+                    <p class="text-xs" style="color:var(--color-text-muted);">控制服务端日志输出的详细程度</p>
+                  </div>
+                </div>
+              </div>
+
+              <!-- OCR Tab -->
+              <div class="settings-panel hidden" data-panel="ocr">
+                <div class="rounded-lg border p-6 space-y-5" style="background:var(--color-bg-card);border-color:var(--color-border);">
+                  <div class="flex items-center gap-3 pb-3 border-b" style="border-color:var(--color-border);">
+                    <div class="flex items-center justify-center w-10 h-10 rounded-lg" style="background:var(--color-primary-dim);">
+                      <i data-lucide="scan-line" class="w-5 h-5" style="color:#ffd700;"></i>
+                    </div>
+                    <div>
+                      <h2 class="text-base font-semibold" style="color:var(--color-text-primary);">OCR 配置</h2>
+                      <p class="text-xs" style="color:var(--color-text-muted);">光学字符识别相关设置</p>
+                    </div>
+                  </div>
+
+                  <div class="flex items-center justify-between p-3 rounded-lg" style="background:var(--color-bg-panel);">
+                    <div>
+                      <div class="text-sm font-medium" style="color:var(--color-text-primary);">启用 OCR</div>
+                      <div class="text-xs" style="color:var(--color-text-muted);">开启后可通过截图识别界面文本</div>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                      <input type="checkbox" name="ocr.enabled" class="sr-only peer">
+                      <div class="w-11 h-6 rounded-full peer transition-all duration-200" style="background:var(--color-bg-elevated);"></div>
+                      <div class="absolute left-0.5 top-0.5 w-5 h-5 rounded-full transition-all duration-200 peer-checked:translate-x-5" style="background:var(--color-star-dim);"></div>
+                    </label>
+                  </div>
+
+                  <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    <div class="space-y-2">
+                      <label class="text-sm font-medium" style="color:var(--color-text-secondary);">识别语言 (Lang)</label>
+                      <input type="text" name="ocr.lang"
+                             class="w-full px-3 py-2 text-sm rounded-lg border focus:outline-none transition-colors duration-200"
+                             style="background:var(--color-bg-panel);border-color:var(--color-border);color:var(--color-text-primary);"
+                             placeholder="ch_sim,en">
+                      <p class="text-xs" style="color:var(--color-text-muted);">OCR 识别语言，逗号分隔</p>
+                    </div>
+                    <div class="space-y-2">
+                      <label class="text-sm font-medium" style="color:var(--color-text-secondary);">检测边长限制 (det_limit_side_len)</label>
+                      <input type="number" name="ocr.det_limit_side_len"
+                             class="w-full px-3 py-2 text-sm rounded-lg border focus:outline-none transition-colors duration-200"
+                             style="background:var(--color-bg-panel);border-color:var(--color-border);color:var(--color-text-primary);"
+                             placeholder="960">
+                      <p class="text-xs" style="color:var(--color-text-muted);">图像检测的最大边长</p>
+                    </div>
+                  </div>
+
+                  <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    <div class="space-y-2">
+                      <label class="text-sm font-medium" style="color:var(--color-text-secondary);">最低置信度 (min_confidence)</label>
+                      <input type="number" step="0.01" name="ocr.min_confidence"
+                             class="w-full px-3 py-2 text-sm rounded-lg border focus:outline-none transition-colors duration-200"
+                             style="background:var(--color-bg-panel);border-color:var(--color-border);color:var(--color-text-primary);"
+                             placeholder="0.5">
+                      <p class="text-xs" style="color:var(--color-text-muted);">OCR 结果最低置信度阈值 (0-1)</p>
+                    </div>
+                    <div class="flex items-center justify-between p-3 rounded-lg self-end" style="background:var(--color-bg-panel);">
+                      <div>
+                        <div class="text-sm font-medium" style="color:var(--color-text-primary);">使用 GPU 加速</div>
+                        <div class="text-xs" style="color:var(--color-text-muted);">启用 GPU 推理加速</div>
+                      </div>
+                      <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" name="ocr.use_gpu" class="sr-only peer">
+                        <div class="w-11 h-6 rounded-full peer transition-all duration-200" style="background:var(--color-bg-elevated);"></div>
+                        <div class="absolute left-0.5 top-0.5 w-5 h-5 rounded-full transition-all duration-200 peer-checked:translate-x-5" style="background:var(--color-star-dim);"></div>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Emissary Tab -->
+              <div class="settings-panel hidden" data-panel="emissary">
+                <div class="rounded-lg border p-6 space-y-5" style="background:var(--color-bg-card);border-color:var(--color-border);">
+                  <div class="flex items-center gap-3 pb-3 border-b" style="border-color:var(--color-border);">
+                    <div class="flex items-center justify-center w-10 h-10 rounded-lg" style="background:var(--color-primary-dim);">
+                      <i data-lucide="bot" class="w-5 h-5" style="color:#ffd700;"></i>
+                    </div>
+                    <div>
+                      <h2 class="text-base font-semibold" style="color:var(--color-text-primary);">星使配置</h2>
+                      <p class="text-xs" style="color:var(--color-text-muted);">星使交互与响应参数</p>
+                    </div>
+                  </div>
+
+                  <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    <div class="space-y-2">
+                      <label class="text-sm font-medium" style="color:var(--color-text-secondary);">默认等待超时 (default_wait_timeout)</label>
+                      <div class="flex items-center gap-2">
+                        <input type="number" name="emissary.default_wait_timeout"
+                               class="flex-1 px-3 py-2 text-sm rounded-lg border focus:outline-none transition-colors duration-200"
+                               style="background:var(--color-bg-panel);border-color:var(--color-border);color:var(--color-text-primary);"
+                               placeholder="30">
+                        <span class="text-sm" style="color:var(--color-text-muted);">秒</span>
+                      </div>
+                      <p class="text-xs" style="color:var(--color-text-muted);">等待星使响应的默认超时时间</p>
+                    </div>
+                    <div class="space-y-2">
+                      <label class="text-sm font-medium" style="color:var(--color-text-secondary);">响应轮询间隔 (response_poll_interval)</label>
+                      <div class="flex items-center gap-2">
+                        <input type="number" step="0.1" name="emissary.response_poll_interval"
+                               class="flex-1 px-3 py-2 text-sm rounded-lg border focus:outline-none transition-colors duration-200"
+                               style="background:var(--color-bg-panel);border-color:var(--color-border);color:var(--color-text-primary);"
+                               placeholder="1.0">
+                        <span class="text-sm" style="color:var(--color-text-muted);">秒</span>
+                      </div>
+                      <p class="text-xs" style="color:var(--color-text-muted);">轮询星使响应的时间间隔</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Logging Tab -->
+              <div class="settings-panel hidden" data-panel="logging">
+                <div class="rounded-lg border p-6 space-y-5" style="background:var(--color-bg-card);border-color:var(--color-border);">
+                  <div class="flex items-center gap-3 pb-3 border-b" style="border-color:var(--color-border);">
+                    <div class="flex items-center justify-center w-10 h-10 rounded-lg" style="background:var(--color-primary-dim);">
+                      <i data-lucide="file-text" class="w-5 h-5" style="color:#ffd700;"></i>
+                    </div>
+                    <div>
+                      <h2 class="text-base font-semibold" style="color:var(--color-text-primary);">日志配置</h2>
+                      <p class="text-xs" style="color:var(--color-text-muted);">日志轮转与保留策略</p>
+                    </div>
+                  </div>
+
+                  <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+                    <div class="space-y-2">
+                      <label class="text-sm font-medium" style="color:var(--color-text-secondary);">轮转策略 (Rotation)</label>
+                      <select name="logging.rotation"
+                              class="w-full px-3 py-2 text-sm rounded-lg border cursor-pointer focus:outline-none transition-colors duration-200"
+                              style="background:var(--color-bg-panel);border-color:var(--color-border);color:var(--color-text-primary);">
+                        <option value="daily">按天轮转</option>
+                        <option value="hourly">按小时轮转</option>
+                        <option value="10 MB">按大小 (10 MB)</option>
+                        <option value="50 MB">按大小 (50 MB)</option>
+                        <option value="100 MB">按大小 (100 MB)</option>
+                      </select>
+                      <p class="text-xs" style="color:var(--color-text-muted);">日志文件轮转触发条件</p>
+                    </div>
+                    <div class="space-y-2">
+                      <label class="text-sm font-medium" style="color:var(--color-text-secondary);">保留数量 (Retention)</label>
+                      <select name="logging.retention"
+                              class="w-full px-3 py-2 text-sm rounded-lg border cursor-pointer focus:outline-none transition-colors duration-200"
+                              style="background:var(--color-bg-panel);border-color:var(--color-border);color:var(--color-text-primary);">
+                        <option value="7">7 天</option>
+                        <option value="14">14 天</option>
+                        <option value="30">30 天</option>
+                        <option value="90">90 天</option>
+                        <option value="unlimited">不限</option>
+                      </select>
+                      <p class="text-xs" style="color:var(--color-text-muted);">日志文件保留数量/天数</p>
+                    </div>
+                    <div class="space-y-2">
+                      <label class="text-sm font-medium" style="color:var(--color-text-secondary);">压缩方式 (Compression)</label>
+                      <select name="logging.compression"
+                              class="w-full px-3 py-2 text-sm rounded-lg border cursor-pointer focus:outline-none transition-colors duration-200"
+                              style="background:var(--color-bg-panel);border-color:var(--color-border);color:var(--color-text-primary);">
+                        <option value="none">不压缩</option>
+                        <option value="gz">gzip (.gz)</option>
+                        <option value="zip">zip</option>
+                        <option value="bz2">bzip2</option>
+                      </select>
+                      <p class="text-xs" style="color:var(--color-text-muted);">归档日志的压缩格式</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Directories Tab -->
+              <div class="settings-panel hidden" data-panel="directories">
+                <div class="rounded-lg border p-6 space-y-5" style="background:var(--color-bg-card);border-color:var(--color-border);">
+                  <div class="flex items-center gap-3 pb-3 border-b" style="border-color:var(--color-border);">
+                    <div class="flex items-center justify-center w-10 h-10 rounded-lg" style="background:var(--color-primary-dim);">
+                      <i data-lucide="folder" class="w-5 h-5" style="color:#ffd700;"></i>
+                    </div>
+                    <div>
+                      <h2 class="text-base font-semibold" style="color:var(--color-text-primary);">目录配置</h2>
+                      <p class="text-xs" style="color:var(--color-text-muted);">数据存储路径设置</p>
+                    </div>
+                  </div>
+
+                  <div class="space-y-5">
+                    <div class="space-y-2">
+                      <label class="text-sm font-medium" style="color:var(--color-text-secondary);">日志目录 (logs)</label>
+                      <div class="flex gap-2">
+                        <input type="text" name="directories.logs"
+                               class="flex-1 px-3 py-2 text-sm rounded-lg border focus:outline-none transition-colors duration-200 font-mono"
+                               style="background:var(--color-bg-panel);border-color:var(--color-border);color:var(--color-text-primary);"
+                               placeholder="./logs">
+                        <button type="button" class="px-3 py-2 text-sm rounded-lg border transition-colors duration-200 whitespace-nowrap"
+                                style="background:var(--color-bg-panel);border-color:var(--color-border);color:var(--color-text-secondary);">
+                          <i data-lucide="folder-open" class="w-4 h-4"></i>
+                        </button>
+                      </div>
+                      <p class="text-xs" style="color:var(--color-text-muted);">日志文件存储目录</p>
+                    </div>
+
+                    <div class="space-y-2">
+                      <label class="text-sm font-medium" style="color:var(--color-text-secondary);">插件目录 (plugins)</label>
+                      <div class="flex gap-2">
+                        <input type="text" name="directories.plugins"
+                               class="flex-1 px-3 py-2 text-sm rounded-lg border focus:outline-none transition-colors duration-200 font-mono"
+                               style="background:var(--color-bg-panel);border-color:var(--color-border);color:var(--color-text-primary);"
+                               placeholder="./plugins">
+                        <button type="button" class="px-3 py-2 text-sm rounded-lg border transition-colors duration-200 whitespace-nowrap"
+                                style="background:var(--color-bg-panel);border-color:var(--color-border);color:var(--color-text-secondary);">
+                          <i data-lucide="folder-open" class="w-4 h-4"></i>
+                        </button>
+                      </div>
+                      <p class="text-xs" style="color:var(--color-text-muted);">插件安装与加载目录</p>
+                    </div>
+
+                    <div class="space-y-2">
+                      <label class="text-sm font-medium" style="color:var(--color-text-secondary);">数据目录 (data)</label>
+                      <div class="flex gap-2">
+                        <input type="text" name="directories.data"
+                               class="flex-1 px-3 py-2 text-sm rounded-lg border focus:outline-none transition-colors duration-200 font-mono"
+                               style="background:var(--color-bg-panel);border-color:var(--color-border);color:var(--color-text-primary);"
+                               placeholder="./data">
+                        <button type="button" class="px-3 py-2 text-sm rounded-lg border transition-colors duration-200 whitespace-nowrap"
+                                style="background:var(--color-bg-panel);border-color:var(--color-border);color:var(--color-text-secondary);">
+                          <i data-lucide="folder-open" class="w-4 h-4"></i>
+                        </button>
+                      </div>
+                      <p class="text-xs" style="color:var(--color-text-muted);">应用数据存储目录</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+            </form>
+
+            <!-- Save Button Bar -->
+            <div id="save-bar" class="hidden sticky bottom-0 mt-6 -mx-4 lg:-mx-6 px-4 lg:px-6 py-4 border-t"
+                 style="background:var(--color-bg-panel);border-color:var(--color-border);">
+              <div class="max-w-4xl mx-auto flex items-center justify-between">
+                <div class="text-sm" style="color:var(--color-text-muted);">
+                  <span id="unsaved-indicator" class="hidden inline-flex items-center gap-1">
+                    <span class="w-2 h-2 rounded-full" style="background:var(--state-warning);"></span>
+                    有未保存的更改
+                  </span>
+                </div>
+                <div class="flex items-center gap-3">
+                  <button type="button" id="btn-reset-config"
+                          class="px-4 py-2 text-sm rounded-lg border transition-colors duration-200"
+                          style="background:transparent;border-color:var(--color-border);color:var(--color-text-secondary);">
+                    重置
+                  </button>
+                  <button type="button" id="btn-save-config"
+                          class="flex items-center gap-2 px-5 py-2 text-sm font-medium rounded-lg transition-all duration-200 hover:brightness-110"
+                          style="background:var(--color-primary);color:var(--color-bg-deep);">
+                    <i data-lucide="save" class="w-4 h-4"></i>
+                    保存配置
+                  </button>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <style>
+      /* Toggle switch styles */
+      .peer:checked + div {
+        background: var(--color-primary) !important;
+      }
+      .peer:checked + div + div {
+        background: var(--color-bg-deep) !important;
+      }
+
+      /* Input focus styles */
+      input:focus, select:focus {
+        border-color: var(--color-primary) !important;
+        box-shadow: 0 0 0 2px var(--color-primary-dim);
+      }
+
+      input:hover, select:hover {
+        border-color: var(--color-border-glow) !important;
+      }
+
+      /* Button hover */
+      button:hover {
+        opacity: 0.85;
+      }
+
+      /* Sidebar nav hover */
+      aside nav a:not([style*="background:var(--color-primary-dim)"]):hover {
+        background: var(--color-bg-hover);
+        color: var(--color-text-secondary);
+      }
+    </style>
+
+    <script>lucide.createIcons();</script>
+
+    <script>
+      let currentConfig = null;
+      let originalConfig = null;
+      let currentTab = 'server';
+
+      function switchTab(tab) {
+        currentTab = tab;
+        document.querySelectorAll('.settings-tab').forEach(btn => {
+          const isActive = btn.dataset.tab === tab;
+          btn.style.color = isActive ? '#ffd700' : 'var(--color-text-muted)';
+          btn.style.borderBottom = isActive ? '2px solid #ffd700' : '2px solid transparent';
+        });
+        document.querySelectorAll('.settings-panel').forEach(panel => {
+          panel.classList.toggle('hidden', panel.dataset.panel !== tab);
+        });
+      }
+
+      function flattenConfig(obj, prefix = '') {
+        const result = {};
+        for (const key in obj) {
+          const fullKey = prefix ? `${prefix}.${key}` : key;
+          if (typeof obj[key] === 'object' && obj[key] !== null && !Array.isArray(obj[key])) {
+            Object.assign(result, flattenConfig(obj[key], fullKey));
+          } else {
+            result[fullKey] = obj[key];
+          }
+        }
+        return result;
+      }
+
+      function unflattenConfig(flat) {
+        const result = {};
+        for (const key in flat) {
+          const parts = key.split('.');
+          let current = result;
+          for (let i = 0; i < parts.length - 1; i++) {
+            if (!current[parts[i]]) current[parts[i]] = {};
+            current = current[parts[i]];
+          }
+          current[parts[parts.length - 1]] = flat[key];
+        }
+        return result;
+      }
+
+      function populateForm(config) {
+        const flat = flattenConfig(config);
+        const form = document.getElementById('config-form');
+        form.querySelectorAll('[name]').forEach(el => {
+          const name = el.name;
+          if (flat[name] === undefined) return;
+          if (el.type === 'checkbox') {
+            el.checked = !!flat[name];
+          } else {
+            el.value = flat[name];
+          }
+        });
+      }
+
+      function collectFormData() {
+        const form = document.getElementById('config-form');
+        const flat = {};
+        form.querySelectorAll('[name]').forEach(el => {
+          if (el.type === 'checkbox') {
+            flat[el.name] = el.checked;
+          } else if (el.type === 'number') {
+            const val = parseFloat(el.value);
+            flat[el.name] = isNaN(val) ? el.value : val;
+          } else {
+            flat[el.name] = el.value;
+          }
+        });
+        return unflattenConfig(flat);
+      }
+
+      function checkUnsaved() {
+        if (!originalConfig) return false;
+        const current = collectFormData();
+        const changed = JSON.stringify(current) !== JSON.stringify(originalConfig);
+        const indicator = document.getElementById('unsaved-indicator');
+        if (indicator) indicator.classList.toggle('hidden', !changed);
+        return changed;
+      }
+
+      async function loadConfig() {
+        const loading = document.getElementById('config-loading');
+        const form = document.getElementById('config-form');
+        const saveBar = document.getElementById('save-bar');
+
+        loading.classList.remove('hidden');
+        form.classList.add('hidden');
+        saveBar.classList.add('hidden');
+
+        try {
+          const config = await configApi.get();
+          currentConfig = config;
+          originalConfig = JSON.parse(JSON.stringify(config));
+          populateForm(config);
+          loading.classList.add('hidden');
+          form.classList.remove('hidden');
+          saveBar.classList.remove('hidden');
+          lucide.createIcons();
+        } catch (e) {
+          console.error('Failed to load config:', e);
+          loading.innerHTML = `
+            <div class="text-center">
+              <i data-lucide="alert-circle" class="w-8 h-8 mx-auto mb-2" style="color:var(--state-error);"></i>
+              <p style="color:var(--state-error);">加载配置失败</p>
+              <p class="text-xs mt-1" style="color:var(--color-text-muted);">${escapeHtml(e.message)}</p>
+              <button type="button" onclick="loadConfig()" class="mt-4 px-4 py-2 text-sm rounded-lg border transition-colors duration-200"
+                      style="background:var(--color-bg-panel);border-color:var(--color-border);color:var(--color-text-secondary);">
+                重试
+              </button>
+            </div>
+          `;
+          lucide.createIcons();
+        }
+      }
+
+      async function saveConfig() {
+        const btn = document.getElementById('btn-save-config');
+        const originalText = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<i data-lucide="loader" class="w-4 h-4 animate-spin"></i> 保存中…';
+        lucide.createIcons();
+
+        try {
+          const newConfig = collectFormData();
+          const result = await configApi.update(newConfig);
+          currentConfig = newConfig;
+          originalConfig = JSON.parse(JSON.stringify(newConfig));
+          checkUnsaved();
+          showNotification('配置保存成功', 'success');
+        } catch (e) {
+          console.error('Failed to save config:', e);
+          showNotification(`保存失败: ${e.message}`, 'error');
+        } finally {
+          btn.disabled = false;
+          btn.innerHTML = originalText;
+          lucide.createIcons();
+        }
+      }
+
+      function resetConfig() {
+        if (!originalConfig) return;
+        if (checkUnsaved() && !confirm('确定要重置所有未保存的更改吗？')) return;
+        populateForm(originalConfig);
+        checkUnsaved();
+        showNotification('已重置为原始配置', 'info');
+      }
+
+      document.querySelectorAll('.settings-tab').forEach(btn => {
+        btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+      });
+
+      document.getElementById('btn-save-config').addEventListener('click', saveConfig);
+      document.getElementById('btn-reset-config').addEventListener('click', resetConfig);
+
+      document.getElementById('config-form').addEventListener('input', checkUnsaved);
+      document.getElementById('config-form').addEventListener('change', checkUnsaved);
+
+      loadConfig();
+    </script>
+</body>
+</html>

@@ -1,0 +1,108 @@
+{
+  "data": [
+    {
+      "id": "page-starmap",
+      "title": "星图面板",
+      "type": "page",
+      "version": 1,
+      "createdAt": 1782472500000,
+      "canvasData": {
+        "x": 200,
+        "y": 0,
+        "group": 0
+      },
+      "devMetadata": {
+        "htmlSrc": "pages/starmap.html",
+        "interactions": [
+          {
+            "domId": "nav-starmap",
+            "targetPageId": "page-starmap"
+          },
+          {
+            "domId": "nav-orbit",
+            "targetPageId": "page-orbit"
+          },
+          {
+            "domId": "nav-starlight",
+            "targetPageId": "page-starlight"
+          },
+          {
+            "domId": "btn-create-nova",
+            "targetPageId": "page-orbit",
+            "transitionLabel": "创建新星"
+          }
+        ]
+      }
+    },
+    {
+      "id": "page-orbit",
+      "title": "星轨控制台",
+      "type": "page",
+      "version": 1,
+      "createdAt": 1782472600000,
+      "canvasData": {
+        "x": 200,
+        "y": 377,
+        "group": 0
+      },
+      "devMetadata": {
+        "htmlSrc": "pages/orbit.html",
+        "interactions": [
+          {
+            "domId": "nav-starmap",
+            "targetPageId": "page-starmap",
+            "hideEdge": true,
+            "transitionLabel": "返回星图"
+          },
+          {
+            "domId": "nav-orbit",
+            "targetPageId": "page-orbit"
+          },
+          {
+            "domId": "nav-starlight",
+            "targetPageId": "page-starlight"
+          }
+        ]
+      }
+    },
+    {
+      "id": "page-starlight",
+      "title": "星辉审查",
+      "type": "page",
+      "version": 1,
+      "createdAt": 1782472700000,
+      "canvasData": {
+        "x": 200,
+        "y": 754,
+        "group": 0
+      },
+      "devMetadata": {
+        "htmlSrc": "pages/starlight.html",
+        "interactions": [
+          {
+            "domId": "nav-starmap",
+            "targetPageId": "page-starmap",
+            "hideEdge": true,
+            "transitionLabel": "返回星图"
+          },
+          {
+            "domId": "nav-orbit",
+            "targetPageId": "page-orbit",
+            "hideEdge": true,
+            "transitionLabel": "查看星轨"
+          },
+          {
+            "domId": "nav-starlight",
+            "targetPageId": "page-starlight"
+          }
+        ]
+      }
+    }
+  ],
+  "config": {
+    "autoLayout": true,
+    "deviceType": "desktop",
+    "projectName": "群星 Star 前端",
+    "designLibrary": null
+  }
+}

@@ -1,0 +1,1006 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>群星 Star - 控制面板</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        :root {
+            --bg-primary: #0a0e17;
+            --bg-secondary: #111827;
+            --bg-tertiary: #1f2937;
+            --border: #374151;
+            --text-primary: #f3f4f6;
+            --text-secondary: #9ca3af;
+            --text-muted: #6b7280;
+            --accent: #8b5cf6;
+            --accent-glow: rgba(139, 92, 246, 0.3);
+            --success: #10b981;
+            --warning: #f59e0b;
+            --error: #ef4444;
+            --info: #3b82f6;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow: hidden;
+        }
+        
+        /* 星空背景 */
+        .starfield {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            pointer-events: none;
+            z-index: 0;
+        }
+        
+        .star {
+            position: absolute;
+            width: 2px;
+            height: 2px;
+            background: white;
+            border-radius: 50%;
+            animation: twinkle 3s infinite;
+        }
+        
+        @keyframes twinkle {
+            0%, 100% { opacity: 0.3; }
+            50% { opacity: 1; }
+        }
+        
+        /* 主布局 */
+        .app {
+            position: relative;
+            z-index: 1;
+            display: grid;
+            grid-template-columns: 320px 1fr 380px;
+            grid-template-rows: 60px 1fr;
+            height: 100vh;
+        }
+        
+        /* 顶部栏 */
+        .header {
+            grid-column: 1 / -1;
+            display: flex;
+            align-items: center;
+            padding: 0 24px;
+            background: rgba(17, 24, 39, 0.8);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid var(--border);
+        }
+        
+        .logo {
+            font-size: 20px;
+            font-weight: 700;
+            background: linear-gradient(135deg, #8b5cf6, #06b6d4);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-right: 32px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .logo-icon {
+            font-size: 24px;
+        }
+        
+        .header-stats {
+            display: flex;
+            gap: 24px;
+            flex: 1;
+        }
+        
+        .stat-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+        
+        .stat-value {
+            color: var(--text-primary);
+            font-weight: 600;
+            font-size: 16px;
+        }
+        
+        .header-actions {
+            display: flex;
+            gap: 12px;
+        }
+        
+        .btn {
+            padding: 8px 16px;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.2s;
+        }
+        
+        .btn:hover {
+            border-color: var(--accent);
+            background: rgba(139, 92, 246, 0.1);
+        }
+        
+        .btn-primary {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #7c3aed;
+            box-shadow: 0 0 20px var(--accent-glow);
+        }
+        
+        /* 左侧：星体列表 */
+        .sidebar-left {
+            background: rgba(17, 24, 39, 0.6);
+            border-right: 1px solid var(--border);
+            overflow-y: auto;
+        }
+        
+        .panel-title {
+            padding: 16px 20px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-muted);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .refresh-btn {
+            font-size: 11px;
+            padding: 4px 8px;
+            cursor: pointer;
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+            border-radius: 4px;
+        }
+        
+        .refresh-btn:hover {
+            color: var(--accent);
+            border-color: var(--accent);
+        }
+        
+        .star-list {
+            padding: 8px;
+        }
+        
+        .star-item {
+            padding: 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-bottom: 4px;
+            border: 1px solid transparent;
+        }
+        
+        .star-item:hover {
+            background: rgba(139, 92, 246, 0.08);
+        }
+        
+        .star-item.active {
+            background: rgba(139, 92, 246, 0.15);
+            border-color: var(--accent);
+        }
+        
+        .star-item-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 6px;
+        }
+        
+        .star-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            background: linear-gradient(135deg, #8b5cf6, #06b6d4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+        }
+        
+        .star-name {
+            font-size: 14px;
+            font-weight: 600;
+        }
+        
+        .star-type-tag {
+            font-size: 10px;
+            padding: 2px 6px;
+            background: var(--bg-tertiary);
+            border-radius: 4px;
+            color: var(--text-secondary);
+            margin-left: auto;
+        }
+        
+        .star-meta {
+            font-size: 12px;
+            color: var(--text-muted);
+            display: flex;
+            gap: 12px;
+        }
+        
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 4px;
+        }
+        
+        .status-dot.active {
+            background: var(--success);
+            box-shadow: 0 0 8px var(--success);
+            animation: pulse 2s infinite;
+        }
+        
+        .status-dot.idle {
+            background: var(--text-muted);
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        /* 中间：主内容区 */
+        .main-content {
+            overflow-y: auto;
+            padding: 24px;
+        }
+        
+        .content-header {
+            margin-bottom: 24px;
+        }
+        
+        .content-title {
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+        
+        .content-subtitle {
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+        
+        /* 卡片 */
+        .card {
+            background: rgba(17, 24, 39, 0.6);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .card-title {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .card-title-icon {
+            font-size: 16px;
+        }
+        
+        /* OCR 显示区 */
+        .ocr-display {
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 16px;
+            min-height: 300px;
+            max-height: 500px;
+            overflow-y: auto;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 13px;
+            line-height: 1.8;
+            color: var(--text-secondary);
+        }
+        
+        .ocr-line {
+            padding: 2px 0;
+            transition: background 0.3s;
+        }
+        
+        .ocr-line:hover {
+            background: rgba(139, 92, 246, 0.1);
+        }
+        
+        .ocr-conf {
+            font-size: 10px;
+            color: var(--text-muted);
+            margin-right: 8px;
+        }
+        
+        .ocr-meta {
+            display: flex;
+            gap: 16px;
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-bottom: 12px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border);
+        }
+        
+        /* 发送区域 */
+        .input-area {
+            display: flex;
+            gap: 12px;
+            margin-top: 16px;
+        }
+        
+        .prompt-input {
+            flex: 1;
+            padding: 12px 16px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 14px;
+            resize: none;
+            height: 80px;
+            font-family: inherit;
+        }
+        
+        .prompt-input:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px var(--accent-glow);
+        }
+        
+        .send-btn {
+            align-self: flex-end;
+            padding: 12px 24px;
+            height: 44px;
+        }
+        
+        /* 右侧：任务/待办 */
+        .sidebar-right {
+            background: rgba(17, 24, 39, 0.6);
+            border-left: 1px solid var(--border);
+            overflow-y: auto;
+        }
+        
+        .tab-group {
+            display: flex;
+            padding: 8px;
+            gap: 4px;
+            border-bottom: 1px solid var(--border);
+        }
+        
+        .tab {
+            flex: 1;
+            padding: 8px 12px;
+            text-align: center;
+            font-size: 12px;
+            color: var(--text-secondary);
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .tab.active {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            font-weight: 600;
+        }
+        
+        .task-list {
+            padding: 8px;
+        }
+        
+        .task-item {
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 4px;
+            border-left: 3px solid var(--border);
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+        
+        .task-item:hover {
+            background: rgba(255, 255, 255, 0.02);
+        }
+        
+        .task-item.status-running {
+            border-left-color: var(--accent);
+            background: rgba(139, 92, 246, 0.05);
+        }
+        
+        .task-item.status-completed {
+            border-left-color: var(--success);
+        }
+        
+        .task-item.status-failed {
+            border-left-color: var(--error);
+        }
+        
+        .task-title {
+            font-size: 13px;
+            margin-bottom: 6px;
+            line-height: 1.4;
+        }
+        
+        .task-meta {
+            font-size: 11px;
+            color: var(--text-muted);
+            display: flex;
+            justify-content: space-between;
+        }
+        
+        /* 状态指示器 */
+        .status-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 10px;
+            font-weight: 600;
+        }
+        
+        .status-badge.running {
+            background: rgba(139, 92, 246, 0.2);
+            color: #a78bfa;
+        }
+        
+        .status-badge.completed {
+            background: rgba(16, 185, 129, 0.2);
+            color: #34d399;
+        }
+        
+        .status-badge.failed {
+            background: rgba(239, 68, 68, 0.2);
+            color: #f87171;
+        }
+        
+        .status-badge.pending {
+            background: rgba(245, 158, 11, 0.2);
+            color: #fbbf24;
+        }
+        
+        /* 空状态 */
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--text-muted);
+        }
+        
+        .empty-icon {
+            font-size: 40px;
+            margin-bottom: 12px;
+        }
+        
+        .empty-text {
+            font-size: 13px;
+        }
+        
+        /* 连接状态 */
+        .conn-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+        }
+        
+        .conn-status.connected {
+            color: var(--success);
+        }
+        
+        .conn-status.disconnected {
+            color: var(--error);
+        }
+        
+        /* 滚动条 */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 3px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--text-muted);
+        }
+    </style>
+</head>
+<body>
+    <div class="starfield" id="starfield"></div>
+    
+    <div class="app">
+        <!-- 顶部栏 -->
+        <div class="header">
+            <div class="logo">
+                <span class="logo-icon">⭐</span>
+                群星 Star
+            </div>
+            <div class="header-stats">
+                <div class="stat-item">
+                    <span>星体</span>
+                    <span class="stat-value" id="starCount">0</span>
+                </div>
+                <div class="stat-item">
+                    <span>活跃</span>
+                    <span class="stat-value" id="activeCount">0</span>
+                </div>
+                <div class="stat-item">
+                    <span>任务</span>
+                    <span class="stat-value" id="taskCount">0</span>
+                </div>
+                <div class="stat-item">
+                    <div class="conn-status disconnected" id="wsStatus">
+                        <span class="status-dot idle" id="wsDot"></span>
+                        <span id="wsText">未连接</span>
+                    </div>
+                </div>
+            </div>
+            <div class="header-actions">
+                <button class="btn" onclick="refreshStars()">🔄 刷新星体</button>
+                <button class="btn btn-primary" onclick="toggleOCRStream()">
+                    <span id="ocrStreamBtnText">开启实时流</span>
+                </button>
+            </div>
+        </div>
+        
+        <!-- 左侧星体列表 -->
+        <div class="sidebar-left">
+            <div class="panel-title">
+                <span>🌟 已发现星体</span>
+                <button class="refresh-btn" onclick="refreshStars()">刷新</button>
+            </div>
+            <div class="star-list" id="starList">
+                <div class="empty-state">
+                    <div class="empty-icon">🌌</div>
+                    <div class="empty-text">加载中...</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 中间主内容 -->
+        <div class="main-content">
+            <div class="content-header">
+                <div class="content-title" id="currentStarName">请选择一个星体</div>
+                <div class="content-subtitle" id="currentStarDesc">从左侧列表选择星体以查看详情</div>
+            </div>
+            
+            <div class="card" id="ocrCard" style="display:none;">
+                <div class="card-title">
+                    <span class="card-title-icon">📝</span>
+                    OCR 实时识别
+                    <span style="margin-left: auto; font-size: 11px; color: var(--text-muted);" id="ocrFpsInfo">--</span>
+                </div>
+                <div class="ocr-meta" id="ocrMeta">
+                    <span>识别区域: <span id="ocrRegion">--</span></span>
+                    <span>行数: <span id="ocrLines">0</span></span>
+                    <span>截图耗时: <span id="ocrCaptureTime">--</span></span>
+                    <span>识别耗时: <span id="ocrRecogTime">--</span></span>
+                </div>
+                <div class="ocr-display" id="ocrDisplay">
+                    <div style="color: var(--text-muted); text-align: center; padding: 60px 0;">
+                        点击上方"开启实时流"按钮开始 OCR 实时识别
+                    </div>
+                </div>
+                <div class="input-area">
+                    <textarea class="prompt-input" id="promptInput" placeholder="输入指令发送给该星体..."></textarea>
+                    <button class="btn btn-primary send-btn" onclick="sendPrompt()">发送</button>
+                </div>
+            </div>
+            
+            <div class="card" id="welcomeCard">
+                <div class="card-title">
+                    <span class="card-title-icon">✨</span>
+                    欢迎使用群星 Star
+                </div>
+                <div style="color: var(--text-secondary); line-height: 1.8; font-size: 14px;">
+                    <p style="margin-bottom: 16px;">群星 Star 是一个 AI Agent 调度中心，可以：</p>
+                    <ul style="padding-left: 20px; margin-bottom: 16px;">
+                        <li style="margin-bottom: 8px;">🔍 自动发现本机运行的 AI Agent 应用</li>
+                        <li style="margin-bottom: 8px;">📤 向 Agent 发送指令（文本注入）</li>
+                        <li style="margin-bottom: 8px;">📥 通过 OCR 实时捕获 Agent 输出</li>
+                        <li style="margin-bottom: 8px;">🤖 多 Agent 协同（星座模式）</li>
+                        <li style="margin-bottom: 8px;">📊 历史记录与统计分析</li>
+                        <li style="margin-bottom: 8px;">🔌 插件系统扩展能力</li>
+                    </ul>
+                    <p>从左侧选择一个星体开始使用吧！</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 右侧面板 -->
+        <div class="sidebar-right">
+            <div class="tab-group">
+                <div class="tab active" data-tab="tasks" onclick="switchTab('tasks')">任务列表</div>
+                <div class="tab" data-tab="todos" onclick="switchTab('todos')">待办事项</div>
+            </div>
+            
+            <div id="tasksTab" class="task-list">
+                <div class="empty-state">
+                    <div class="empty-icon">📋</div>
+                    <div class="empty-text">选择星体后加载任务列表</div>
+                </div>
+            </div>
+            
+            <div id="todosTab" class="task-list" style="display:none;">
+                <div class="empty-state">
+                    <div class="empty-icon">✅</div>
+                    <div class="empty-text">选择星体后加载待办事项</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // ========== 状态管理 ==========
+        let currentStarId = null;
+        let currentStarType = null;
+        let ocrWebSocket = null;
+        let ocrStreaming = false;
+        let lastOcrTime = 0;
+        
+        // ========== 星空背景 ==========
+        function createStarfield() {
+            const starfield = document.getElementById('starfield');
+            for (let i = 0; i < 100; i++) {
+                const star = document.createElement('div');
+                star.className = 'star';
+                star.style.left = Math.random() * 100 + '%';
+                star.style.top = Math.random() * 100 + '%';
+                star.style.animationDelay = Math.random() * 3 + 's';
+                star.style.opacity = Math.random() * 0.7 + 0.3;
+                starfield.appendChild(star);
+            }
+        }
+        
+        // ========== 星体列表 ==========
+        async function refreshStars() {
+            try {
+                const res = await fetch('/api/stars/');
+                const data = await res.json();
+                
+                document.getElementById('starCount').textContent = data.total;
+                document.getElementById('activeCount').textContent = data.shining;
+                
+                const listEl = document.getElementById('starList');
+                
+                if (data.stars.length === 0) {
+                    listEl.innerHTML = `
+                        <div class="empty-state">
+                            <div class="empty-icon">🌌</div>
+                            <div class="empty-text">未发现星体</div>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                listEl.innerHTML = data.stars.map(star => `
+                    <div class="star-item ${star.pid === currentStarId ? 'active' : ''}" 
+                         onclick="selectStar('${star.pid}', '${star.star_type}', '${escapeHtml(star.title)}')">
+                        <div class="star-item-header">
+                            <div class="star-icon">${getStarIcon(star.star_type)}</div>
+                            <div class="star-name">${star.star_type}</div>
+                            <span class="star-type-tag">PID: ${star.pid}</span>
+                        </div>
+                        <div class="star-meta">
+                            <span>
+                                <span class="status-dot ${star.is_shining ? 'active' : 'idle'}"></span>
+                                ${star.is_shining ? '运行中' : '空闲'}
+                            </span>
+                        </div>
+                    </div>
+                `).join('');
+                
+            } catch (e) {
+                console.error('刷新星体失败:', e);
+            }
+        }
+        
+        function getStarIcon(type) {
+            const icons = {
+                'trae': '🌟',
+                'chatgpt': '💬',
+                'claude': '🎭',
+                'cursor': '🖱️',
+                'windsurf': '🏄',
+                'gemini': '💎',
+                'doubao': '🫘',
+                'kimi': '🌙',
+                'deepseek': '🔍',
+            };
+            return icons[type.toLowerCase()] || '⭐';
+        }
+        
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        // ========== 星体选择 ==========
+        async function selectStar(pid, type, title) {
+            currentStarId = pid;
+            currentStarType = type;
+            
+            // 如果正在流，先断开
+            if (ocrStreaming) {
+                toggleOCRStream();
+            }
+            
+            document.getElementById('currentStarName').textContent = `${getStarIcon(type)} ${type}`;
+            document.getElementById('currentStarDesc').textContent = `PID: ${pid} | ${title}`;
+            
+            document.getElementById('welcomeCard').style.display = 'none';
+            document.getElementById('ocrCard').style.display = 'block';
+            
+            // 高亮选中项
+            document.querySelectorAll('.star-item').forEach(el => {
+                el.classList.remove('active');
+            });
+            event.currentTarget.classList.add('active');
+            
+            // 加载任务列表
+            loadTasks();
+            loadTodos();
+            
+            // 刷新列表以更新高亮
+            refreshStars();
+        }
+        
+        // ========== OCR 实时流 ==========
+        function toggleOCRStream() {
+            if (!currentStarId) {
+                alert('请先选择一个星体');
+                return;
+            }
+            
+            if (ocrStreaming) {
+                // 关闭流
+                if (ocrWebSocket) {
+                    ocrWebSocket.close();
+                    ocrWebSocket = null;
+                }
+                ocrStreaming = false;
+                document.getElementById('ocrStreamBtnText').textContent = '开启实时流';
+                updateWsStatus(false);
+            } else {
+                // 开启流
+                startOCRStream();
+            }
+        }
+        
+        function startOCRStream() {
+            const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${location.host}/ws/ocr/${currentStarId}?interval=3`;
+            
+            ocrWebSocket = new WebSocket(wsUrl);
+            
+            ocrWebSocket.onopen = () => {
+                ocrStreaming = true;
+                document.getElementById('ocrStreamBtnText').textContent = '关闭实时流';
+                updateWsStatus(true);
+            };
+            
+            ocrWebSocket.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                if (data.type === 'ocr_update') {
+                    renderOCRResult(data.data);
+                }
+            };
+            
+            ocrWebSocket.onclose = () => {
+                ocrStreaming = false;
+                document.getElementById('ocrStreamBtnText').textContent = '开启实时流';
+                updateWsStatus(false);
+            };
+            
+            ocrWebSocket.onerror = () => {
+                console.error('OCR WebSocket 错误');
+            };
+        }
+        
+        function renderOCRResult(data) {
+            const now = Date.now();
+            const fps = lastOcrTime ? (1000 / (now - lastOcrTime)).toFixed(1) : '--';
+            lastOcrTime = now;
+            
+            document.getElementById('ocrFpsInfo').textContent = `${fps} FPS`;
+            document.getElementById('ocrRegion').textContent = data.region;
+            document.getElementById('ocrLines').textContent = data.line_count;
+            document.getElementById('ocrCaptureTime').textContent = (data.capture_time || 0).toFixed(3) + 's';
+            document.getElementById('ocrRecogTime').textContent = (data.recognize_time || 0).toFixed(3) + 's';
+            
+            const display = document.getElementById('ocrDisplay');
+            if (data.lines && data.lines.length > 0) {
+                display.innerHTML = data.lines.map(line => `
+                    <div class="ocr-line">
+                        <span class="ocr-conf">[${(line.confidence * 100).toFixed(0)}%]</span>
+                        ${escapeHtml(line.text)}
+                    </div>
+                `).join('');
+                display.scrollTop = display.scrollHeight;
+            } else {
+                display.innerHTML = '<div style="color: var(--text-muted);">未识别到文字</div>';
+            }
+        }
+        
+        function updateWsStatus(connected) {
+            const statusEl = document.getElementById('wsStatus');
+            const dotEl = document.getElementById('wsDot');
+            const textEl = document.getElementById('wsText');
+            
+            if (connected) {
+                statusEl.className = 'conn-status connected';
+                dotEl.className = 'status-dot active';
+                textEl.textContent = '已连接';
+            } else {
+                statusEl.className = 'conn-status disconnected';
+                dotEl.className = 'status-dot idle';
+                textEl.textContent = '未连接';
+            }
+        }
+        
+        // ========== 发送指令 ==========
+        async function sendPrompt() {
+            const prompt = document.getElementById('promptInput').value.trim();
+            if (!prompt) return;
+            if (!currentStarId) {
+                alert('请先选择一个星体');
+                return;
+            }
+            
+            const btn = event.currentTarget;
+            btn.disabled = true;
+            btn.textContent = '发送中...';
+            
+            try {
+                const res = await fetch(`/api/emissary/${currentStarId}/send`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ prompt })
+                });
+                const data = await res.json();
+                
+                if (data.success) {
+                    document.getElementById('promptInput').value = '';
+                    
+                    if (!ocrStreaming) {
+                        toggleOCRStream();
+                    }
+                }
+            } catch (e) {
+                console.error('发送失败:', e);
+                alert('发送失败: ' + e.message);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '发送';
+            }
+        }
+        
+        // ========== 任务/待办加载 ==========
+        async function loadTasks() {
+            if (!currentStarId) return;
+            
+            try {
+                const res = await fetch(`/api/emissary/${currentStarId}/tasks`);
+                const data = await res.json();
+                
+                document.getElementById('taskCount').textContent = data.count || 0;
+                
+                const container = document.getElementById('tasksTab');
+                if (data.tasks && data.tasks.length > 0) {
+                    container.innerHTML = data.tasks.map(task => `
+                        <div class="task-item status-${task.status}">
+                            <div class="task-title">${escapeHtml(task.title)}</div>
+                            <div class="task-meta">
+                                <span class="status-badge ${task.status}">${getStatusText(task.status)}</span>
+                            </div>
+                        </div>
+                    `).join('');
+                } else {
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <div class="empty-icon">📋</div>
+                            <div class="empty-text">暂无任务</div>
+                        </div>
+                    `;
+                }
+            } catch (e) {
+                console.error('加载任务失败:', e);
+            }
+        }
+        
+        async function loadTodos() {
+            if (!currentStarId) return;
+            
+            try {
+                const res = await fetch(`/api/emissary/${currentStarId}/todos`);
+                const data = await res.json();
+                
+                const container = document.getElementById('todosTab');
+                if (data.todos && data.todos.length > 0) {
+                    container.innerHTML = data.todos.map(todo => `
+                        <div class="task-item status-${todo.status}">
+                            <div class="task-title">${escapeHtml(todo.title)}</div>
+                            <div class="task-meta">
+                                <span class="status-badge ${todo.status}">${getStatusText(todo.status)}</span>
+                            </div>
+                        </div>
+                    `).join('');
+                } else {
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <div class="empty-icon">✅</div>
+                            <div class="empty-text">暂无待办</div>
+                        </div>
+                    `;
+                }
+            } catch (e) {
+                console.error('加载待办失败:', e);
+            }
+        }
+        
+        function getStatusText(status) {
+            const map = {
+                'running': '运行中',
+                'completed': '已完成',
+                'failed': '失败',
+                'pending': '等待中',
+                'unknown': '未知'
+            };
+            return map[status] || status;
+        }
+        
+        // ========== Tab 切换 ==========
+        function switchTab(tab) {
+            document.querySelectorAll('.tab').forEach(el => {
+                el.classList.toggle('active', el.dataset.tab === tab);
+            });
+            document.getElementById('tasksTab').style.display = tab === 'tasks' ? 'block' : 'none';
+            document.getElementById('todosTab').style.display = tab === 'todos' ? 'block' : 'none';
+        }
+        
+        // ========== 初始化 ==========
+        document.addEventListener('DOMContentLoaded', () => {
+            createStarfield();
+            refreshStars();
+            
+            setInterval(() => {
+                if (document.visibilityState === 'visible') {
+                    refreshStars();
+                }
+            }, 10000);
+            
+            document.getElementById('promptInput').addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                    sendPrompt();
+                }
+            });
+        });
+    </script>
+</body>
+</html>
