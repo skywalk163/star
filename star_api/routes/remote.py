@@ -531,3 +531,109 @@ async def get_stars_brief():
             for s in stars
         ]
     }
+
+
+# ==================== 批量群发指令 ====================
+
+@router.post("/broadcast/send", dependencies=[Depends(require_control)])
+async def broadcast_send(
+    hwids: list[int],
+    text: str,
+    parallel: bool = True,
+):
+    """
+    批量发送指令到多个窗口
+    
+    Args:
+        hwids: 窗口句柄列表
+        text: 要发送的指令文本
+        parallel: 是否并行发送（默认 True）
+    """
+    from star_core.star_emissary import StarEmissary
+    from star_core.star_seeker import StarSeeker
+    import asyncio
+
+    if state.orbit_engine is None or state.orbit_engine.star_seeker is None:
+        raise HTTPException(status_code=503, detail="星核未初始化")
+
+    seeker = state.orbit_engine.star_seeker
+    results = []
+
+    async def send_to_hwnd(hwnd: int):
+        try:
+            star = seeker.get_star(hwnd)
+            if not star:
+                return {"hwnd": hwnd, "success": False, "error": "Star not found"}
+
+            # 获取适配器
+            from star_core.star_emissary import StarAdapter
+            adapter = StarAdapter.from_star_type(star.star_type)
+            emissary = StarEmissary(star=star, adapter_name=adapter.config.name)
+
+            # 发送指令
+            success = emissary.send_prompt(text)
+            audit('broadcast_send', hwnd=hwnd, params={'text_length': len(text)})
+
+            return {
+                "hwnd": hwnd,
+                "success": success,
+                "star_type": star.star_type,
+                "title": star.title
+            }
+        except Exception as e:
+            return {"hwnd": hwnd, "success": False, "error": str(e)}
+
+    # 并行或串行执行
+    if parallel:
+        tasks = [send_to_hwnd(hwnd) for hwnd in hwids]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        # 处理异常
+        results = [
+            r if not isinstance(r, Exception) else {"error": str(r)}
+            for r in results
+        ]
+    else:
+        for hwnd in hwids:
+            results.append(await send_to_hwnd(hwnd))
+
+    return {
+        "success": True,
+        "total": len(hwids),
+        "sent": sum(1 for r in results if r.get("success")),
+        "failed": sum(1 for r in results if not r.get("success")),
+        "results": results
+    }
+
+
+@router.get("/broadcast/status/{hwnd}", dependencies=[Depends(require_read)])
+async def get_broadcast_status(hwnd: int):
+    """
+    获取窗口当前状态（用于轮询批量指令结果）
+    """
+    try:
+        from star_core.ocr_gazer import OCRGazer
+        from star_core.star_seeker import StarSeeker
+
+        if state.orbit_engine is None:
+            raise HTTPException(status_code=503, detail="星核未初始化")
+
+        seeker = state.orbit_engine.star_seeker
+        star = seeker.get_star(hwnd)
+
+        if not star:
+            raise HTTPException(status_code=404, detail="窗口未找到")
+
+        ocr = OCRGazer()
+        status = ocr.get_current_status(star)
+
+        return {
+            "hwnd": hwnd,
+            "status": status.get("status", "unknown"),
+            "is_active": status.get("is_active", False),
+            "current_task": status.get("current_task"),
+            "timestamp": datetime.now().isoformat()
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        return {"hwnd": hwnd, "status": "error", "error": str(e)}
