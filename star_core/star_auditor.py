@@ -60,12 +60,22 @@ class AuditLogEntry:
 
 
 class AuditLogger:
-    """审计日志管理器（内存环形缓冲区 + 可选文件持久化）"""
+    """审计日志管理器（内存环形缓冲区 + SQLite 持久化 + 可选文件持久化）"""
 
-    def __init__(self, max_entries: int = 1000, log_dir: Optional[str] = None):
+    def __init__(self, max_entries: int = 1000, log_dir: Optional[str] = None,
+                 enable_db: bool = True):
         self._entries: deque = deque(maxlen=max_entries)
         self._lock = Lock()
         self._log_dir = log_dir
+        self._enable_db = enable_db
+        self._db = None
+        
+        if enable_db:
+            try:
+                from star_core.database import get_db_service
+                self._db = get_db_service()
+            except Exception as e:
+                logger.warning(f"初始化审计日志数据库失败: {e}")
 
     def log(
         self,
@@ -91,7 +101,12 @@ class AuditLogger:
         with self._lock:
             self._entries.append(entry)
 
-        # 可选文件日志
+        if self._db:
+            try:
+                self._db.insert_audit_log(entry.to_dict())
+            except Exception as e:
+                logger.warning(f"写入审计日志数据库失败: {e}")
+
         if self._log_dir:
             self._write_to_file(entry)
 
@@ -117,15 +132,26 @@ class AuditLogger:
         hwnd: Optional[int] = None,
         user: Optional[str] = None,
         result: Optional[str] = None,
+        use_db: bool = False,
     ) -> List[dict]:
         """查询审计日志（支持筛选）"""
+        if use_db and self._db:
+            try:
+                rows, _ = self._db.query_audit_logs(
+                    limit=limit, offset=offset,
+                    operation=operation, hwnd=hwnd, result=result
+                )
+                if user:
+                    rows = [r for r in rows if r.get('user') == user]
+                return rows
+            except Exception as e:
+                logger.warning(f"查询审计日志数据库失败: {e}")
+        
         with self._lock:
             entries = list(self._entries)
 
-        # 从新到旧排序
         entries.reverse()
 
-        # 筛选
         if operation:
             entries = [e for e in entries if e.operation == operation]
         if hwnd is not None:
@@ -135,7 +161,6 @@ class AuditLogger:
         if result:
             entries = [e for e in entries if e.result == result]
 
-        # 翻页
         sliced = entries[offset:offset + limit]
         return [e.to_dict() for e in sliced]
 

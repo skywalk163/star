@@ -637,3 +637,111 @@ async def get_broadcast_status(hwnd: int):
         raise
     except Exception as e:
         return {"hwnd": hwnd, "status": "error", "error": str(e)}
+
+
+# ==================== 配置管理 ====================
+
+@router.get("/config/agents")
+async def list_agent_configs():
+    """获取所有 Agent 配置"""
+    from star_core.config_service import get_config_service
+    config_svc = get_config_service()
+    config_svc.reload_if_changed()
+    agents = config_svc.get_all_agents()
+    return {
+        "total": len(agents),
+        "agents": [
+            {
+                "id": aid,
+                "name": a.get("name"),
+                "vendor": a.get("vendor"),
+                "category": a.get("category"),
+                "description": a.get("description"),
+            }
+            for aid, a in agents.items()
+        ]
+    }
+
+
+@router.get("/config/agents/{agent_id}")
+async def get_agent_config(agent_id: str):
+    """获取指定 Agent 的完整配置"""
+    from star_core.config_service import get_config_service
+    config_svc = get_config_service()
+    config_svc.reload_if_changed()
+    agent = config_svc.get_agent(agent_id)
+    if not agent:
+        raise HTTPException(status_code=404, detail="Agent not found")
+    return {"agent": agent}
+
+
+@router.post("/config/reload")
+async def reload_config():
+    """强制重新加载配置"""
+    from star_core.config_service import get_config_service
+    config_svc = get_config_service()
+    success = config_svc.load()
+    return {"success": success, "agent_count": len(config_svc.get_all_agents())}
+
+
+# ==================== 任务历史 ====================
+
+@router.get("/tasks")
+async def list_tasks(status: str = None, limit: int = 100, offset: int = 0):
+    """获取任务历史列表"""
+    from star_core.database import get_db_service
+    db = get_db_service()
+    tasks, total = db.list_tasks(status=status, limit=limit, offset=offset)
+    return {"tasks": tasks, "total": total}
+
+
+@router.get("/tasks/{task_id}")
+async def get_task(task_id: str):
+    """获取单个任务详情"""
+    from star_core.database import get_db_service
+    db = get_db_service()
+    task = db.get_task(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    return {"task": task}
+
+
+@router.post("/tasks")
+async def upsert_task(task_data: dict):
+    """创建或更新任务"""
+    from star_core.database import get_db_service
+    db = get_db_service()
+    task_id = db.upsert_task(task_data)
+    audit('task_upsert', params={'task_id': task_id, 'title': task_data.get('title')})
+    return {"success": True, "task_id": task_id}
+
+
+@router.delete("/tasks/{task_id}")
+async def delete_task(task_id: str):
+    """删除任务"""
+    from star_core.database import get_db_service
+    db = get_db_service()
+    success = db.delete_task(task_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Task not found")
+    audit('task_delete', params={'task_id': task_id})
+    return {"success": True}
+
+
+# ==================== 系统健康检查 ====================
+
+@router.get("/health")
+async def health_check():
+    """系统健康检查"""
+    from star_core.database import get_db_service
+    db_ok = False
+    try:
+        db_ok = get_db_service().health_check()
+    except Exception:
+        pass
+    
+    return {
+        "status": "ok",
+        "database": "healthy" if db_ok else "degraded",
+        "timestamp": datetime.now().isoformat()
+    }

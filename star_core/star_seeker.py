@@ -396,10 +396,22 @@ class StarSeeker:
                 self._plugin_signatures[star_type] = sig
             except Exception:
                 pass
-
+    
     def get_all_signatures(self) -> dict:
-        """获取所有星体签名（内置 + 插件）"""
+        """获取所有星体签名（内置 + 配置文件 + 插件）"""
         signatures = dict(self.STAR_SIGNATURES)
+        
+        try:
+            from star_core.config_service import get_config_service
+            config_svc = get_config_service()
+            config_svc.reload_if_changed()
+            yaml_signatures = config_svc.get_star_signatures()
+            for key, val in yaml_signatures.items():
+                if key not in signatures:
+                    signatures[key] = val
+        except Exception:
+            pass
+        
         signatures.update(self._plugin_signatures)
         return signatures
 
