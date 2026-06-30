@@ -239,6 +239,96 @@
       }
       .modal-body textarea { resize: vertical; min-height: 80px; }
       .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
+
+      /* Compare View */
+      .compare-view {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+      .compare-toolbar {
+        padding: 10px 16px;
+        background: var(--color-bg-elevated);
+        border-bottom: 1px solid var(--color-border);
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-shrink: 0;
+      }
+      .compare-toolbar-title {
+        font-size: 13px;
+        font-weight: 500;
+        flex: 1;
+      }
+      .compare-toolbar label {
+        font-size: 12px;
+        color: var(--color-text-secondary);
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        cursor: pointer;
+      }
+      .compare-panels {
+        flex: 1;
+        display: flex;
+        overflow: hidden;
+      }
+      .compare-panel {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        border-right: 1px solid var(--color-border);
+        overflow: hidden;
+      }
+      .compare-panel:last-child { border-right: none; }
+      .compare-panel-header {
+        padding: 8px 12px;
+        background: var(--color-bg-card);
+        border-bottom: 1px solid var(--color-border);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-shrink: 0;
+      }
+      .compare-panel-title { font-size: 12px; font-weight: 500; flex: 1; }
+      .compare-panel-body {
+        flex: 1;
+        overflow-y: auto;
+        padding: 12px;
+        font-family: var(--font-mono);
+        font-size: 12px;
+        line-height: 1.6;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+      .diff-add { background: rgba(16, 185, 129, 0.15); color: #34d399; border-left: 2px solid #10b981; padding-left: 6px; }
+      .diff-remove { background: rgba(239, 68, 68, 0.15); color: #f87171; border-left: 2px solid #ef4444; padding-left: 6px; text-decoration: line-through; opacity: 0.7; }
+      .diff-same { color: var(--color-text-primary); }
+      .compare-selectors {
+        display: flex;
+        gap: 8px;
+        padding: 8px 16px;
+        background: var(--color-bg-card);
+        border-bottom: 1px solid var(--color-border);
+        flex-shrink: 0;
+      }
+      .compare-select {
+        padding: 6px 10px;
+        background: var(--color-bg-elevated);
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius-md);
+        color: var(--color-text-primary);
+        font-size: 12px;
+      }
+      .compare-stats {
+        display: flex;
+        gap: 16px;
+        font-size: 11px;
+        color: var(--color-text-muted);
+      }
+      .compare-stats .add-count { color: #34d399; }
+      .compare-stats .remove-count { color: #f87171; }
     </style>
 </head>
 <body>
@@ -297,6 +387,10 @@
 
     <script>
         let currentContext = null;
+        let compareMode = false;
+        let syncScroll = false;
+        let compareLeftAI = null;
+        let compareRightAI = null;
 
         async function init() {
             currentContext = await contextReader.readCurrentContext();
@@ -390,16 +484,25 @@
             
             const panels = task.assignedAIs.map(aiId => renderAIPanel(task.id, aiId)).join('');
             
-            container.innerHTML = `
-                <div class="workspace-header">
-                    <div class="workspace-title">${escapeHtml(task.title)}</div>
-                    ${statusSelect}
-                    <button class="btn btn-sm btn-danger" onclick="deleteTask('${task.id}')">删除</button>
-                </div>
-                <div class="workspace">
-                    ${panels}
-                </div>
-            `;
+            const compareBtn = task.assignedAIs.length >= 2 
+                ? `<button class="btn btn-sm ${compareMode ? 'btn-primary' : ''}" onclick="toggleCompareMode()">${compareMode ? '退出对比' : '🔍 对比模式'}</button>`
+                : '';
+            
+            if (compareMode && task.assignedAIs.length >= 2) {
+                container.innerHTML = renderCompareView(task);
+            } else {
+                container.innerHTML = `
+                    <div class="workspace-header">
+                        <div class="workspace-title">${escapeHtml(task.title)}</div>
+                        ${compareBtn}
+                        ${statusSelect}
+                        <button class="btn btn-sm btn-danger" onclick="deleteTask('${task.id}')">删除</button>
+                    </div>
+                    <div class="workspace">
+                        ${panels}
+                    </div>
+                `;
+            }
         }
 
         function renderAIPanel(taskId, aiId) {
@@ -541,8 +644,233 @@
             alert(success ? '上下文已复制到剪贴板' : '复制失败');
         }
 
+        // ========== 对比模式 ==========
+
+        function toggleCompareMode() {
+            const task = programmingStore.getCurrentTask();
+            if (!task || task.assignedAIs.length < 2) return;
+            
+            compareMode = !compareMode;
+            
+            if (compareMode) {
+                if (!compareLeftAI) compareLeftAI = task.assignedAIs[0];
+                if (!compareRightAI) compareRightAI = task.assignedAIs[1] || task.assignedAIs[0];
+            }
+            
+            renderWorkspace(task.id);
+        }
+
+        function renderCompareView(task) {
+            const leftText = getLastAssistantMessage(task.id, compareLeftAI);
+            const rightText = getLastAssistantMessage(task.id, compareRightAI);
+            
+            let diffStats = { add: 0, remove: 0 };
+            let leftDiffHtml = '';
+            let rightDiffHtml = '';
+            
+            if (leftText && rightText) {
+                const diff = computeLineDiff(leftText, rightText);
+                diffStats = diff.stats;
+                leftDiffHtml = diff.leftHtml;
+                rightDiffHtml = diff.rightHtml;
+            } else {
+                leftDiffHtml = leftText ? escapeHtml(leftText) : '<span style="color: var(--color-text-muted);">暂无回复</span>';
+                rightDiffHtml = rightText ? escapeHtml(rightText) : '<span style="color: var(--color-text-muted);">暂无回复</span>';
+            }
+            
+            return `
+                <div class="workspace-header">
+                    <div class="workspace-title">${escapeHtml(task.title)} — 结果对比</div>
+                    <button class="btn btn-sm btn-primary" onclick="toggleCompareMode()">退出对比</button>
+                    <button class="btn btn-sm btn-danger" onclick="deleteTask('${task.id}')">删除</button>
+                </div>
+                <div class="compare-view">
+                    <div class="compare-selectors">
+                        <select class="compare-select" onchange="setCompareLeft(this.value)">
+                            <option value="" disabled>选择左侧 AI</option>
+                            ${task.assignedAIs.map(ai => `<option value="${ai}" ${ai === compareLeftAI ? 'selected' : ''}>${ai}</option>`).join('')}
+                        </select>
+                        <span style="color: var(--color-text-muted); align-self: center;">VS</span>
+                        <select class="compare-select" onchange="setCompareRight(this.value)">
+                            <option value="" disabled>选择右侧 AI</option>
+                            ${task.assignedAIs.map(ai => `<option value="${ai}" ${ai === compareRightAI ? 'selected' : ''}>${ai}</option>`).join('')}
+                        </select>
+                        <div class="compare-stats">
+                            <span class="add-count">+ ${diffStats.add} 新增</span>
+                            <span class="remove-count">- ${diffStats.remove} 差异</span>
+                        </div>
+                    </div>
+                    <div class="compare-toolbar">
+                        <span class="compare-toolbar-title">
+                            ${leftText ? `${leftText.length} 字符` : '暂无回复'} 
+                            ↔ 
+                            ${rightText ? `${rightText.length} 字符` : '暂无回复'}
+                        </span>
+                        <label>
+                            <input type="checkbox" ${syncScroll ? 'checked' : ''} onchange="toggleSyncScroll(this.checked)">
+                            同步滚动
+                        </label>
+                        <button class="btn btn-sm" onclick="copyCompareLeft()">📋 复制左侧</button>
+                        <button class="btn btn-sm" onclick="copyCompareRight()">📋 复制右侧</button>
+                    </div>
+                    <div class="compare-panels">
+                        <div class="compare-panel">
+                            <div class="compare-panel-header">
+                                <span class="compare-panel-title">${compareLeftAI || '未选择'}</span>
+                            </div>
+                            <div class="compare-panel-body" id="compareLeftBody" onscroll="handleCompareScroll('left')">
+                                ${leftDiffHtml}
+                            </div>
+                        </div>
+                        <div class="compare-panel">
+                            <div class="compare-panel-header">
+                                <span class="compare-panel-title">${compareRightAI || '未选择'}</span>
+                            </div>
+                            <div class="compare-panel-body" id="compareRightBody" onscroll="handleCompareScroll('right')">
+                                ${rightDiffHtml}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function setCompareLeft(aiId) {
+            compareLeftAI = aiId;
+            const task = programmingStore.getCurrentTask();
+            if (task) renderWorkspace(task.id);
+        }
+
+        function setCompareRight(aiId) {
+            compareRightAI = aiId;
+            const task = programmingStore.getCurrentTask();
+            if (task) renderWorkspace(task.id);
+        }
+
+        function toggleSyncScroll(enabled) {
+            syncScroll = enabled;
+        }
+
+        let isSyncing = false;
+        function handleCompareScroll(side) {
+            if (!syncScroll || isSyncing) return;
+            isSyncing = true;
+            
+            const leftBody = document.getElementById('compareLeftBody');
+            const rightBody = document.getElementById('compareRightBody');
+            
+            if (leftBody && rightBody) {
+                const source = side === 'left' ? leftBody : rightBody;
+                const target = side === 'left' ? rightBody : leftBody;
+                
+                const scrollRatio = source.scrollTop / (source.scrollHeight - source.clientHeight);
+                target.scrollTop = scrollRatio * (target.scrollHeight - target.clientHeight);
+            }
+            
+            setTimeout(() => { isSyncing = false; }, 10);
+        }
+
+        function getLastAssistantMessage(taskId, aiId) {
+            if (!aiId) return '';
+            const dialog = programmingStore.getAIDialog(taskId, aiId);
+            if (!dialog || !dialog.messages) return '';
+            const assistantMsgs = dialog.messages.filter(m => m.role === 'assistant');
+            return assistantMsgs.length > 0 ? assistantMsgs[assistantMsgs.length - 1].content : '';
+        }
+
+        function copyCompareLeft() {
+            const task = programmingStore.getCurrentTask();
+            if (!task) return;
+            const text = getLastAssistantMessage(task.id, compareLeftAI);
+            contextReader.copyToClipboard(text);
+            alert('左侧内容已复制');
+        }
+
+        function copyCompareRight() {
+            const task = programmingStore.getCurrentTask();
+            if (!task) return;
+            const text = getLastAssistantMessage(task.id, compareRightAI);
+            contextReader.copyToClipboard(text);
+            alert('右侧内容已复制');
+        }
+
+        // ========== 差异算法 ==========
+
+        function computeLineDiff(text1, text2) {
+            const lines1 = text1.split('\n');
+            const lines2 = text2.split('\n');
+            
+            const result = lcsDiff(lines1, lines2);
+            
+            let leftHtml = '';
+            let rightHtml = '';
+            let addCount = 0;
+            let removeCount = 0;
+            
+            result.forEach(op => {
+                if (op.type === 'same') {
+                    leftHtml += `<div class="diff-same">${escapeHtml(op.value)}</div>`;
+                    rightHtml += `<div class="diff-same">${escapeHtml(op.value)}</div>`;
+                } else if (op.type === 'remove') {
+                    leftHtml += `<div class="diff-remove">${escapeHtml(op.value)}</div>`;
+                    removeCount++;
+                } else if (op.type === 'add') {
+                    rightHtml += `<div class="diff-add">${escapeHtml(op.value)}</div>`;
+                    addCount++;
+                }
+            });
+            
+            return {
+                leftHtml,
+                rightHtml,
+                stats: { add: addCount, remove: removeCount }
+            };
+        }
+
+        function lcsDiff(a, b) {
+            const m = a.length;
+            const n = b.length;
+            
+            const dp = [];
+            for (let i = 0; i <= m; i++) {
+                dp[i] = [];
+                for (let j = 0; j <= n; j++) {
+                    dp[i][j] = 0;
+                }
+            }
+            
+            for (let i = 1; i <= m; i++) {
+                for (let j = 1; j <= n; j++) {
+                    if (a[i-1] === b[j-1]) {
+                        dp[i][j] = dp[i-1][j-1] + 1;
+                    } else {
+                        dp[i][j] = Math.max(dp[i-1][j], dp[i][j-1]);
+                    }
+                }
+            }
+            
+            const result = [];
+            let i = m, j = n;
+            
+            while (i > 0 || j > 0) {
+                if (i > 0 && j > 0 && a[i-1] === b[j-1]) {
+                    result.unshift({ type: 'same', value: a[i-1] });
+                    i--;
+                    j--;
+                } else if (j > 0 && (i === 0 || dp[i][j-1] >= dp[i-1][j])) {
+                    result.unshift({ type: 'add', value: b[j-1] });
+                    j--;
+                } else {
+                    result.unshift({ type: 'remove', value: a[i-1] });
+                    i--;
+                }
+            }
+            
+            return result;
+        }
+
         function escapeHtml(text) {
-            if (!text) return '';
+            if (!text && text !== '') return '';
             const div = document.createElement('div');
             div.textContent = text;
             return div.innerHTML;
