@@ -2,7 +2,8 @@
 星核（Star Core）- 群星调度核心引擎
 """
 
-from star_core.star_seeker import StarSeeker, StarBody
+from star_core.star_seeker import StarSeeker
+from star_core.models import StarBody, StarWindow, StarWindowContext, AuditLogEntry
 from star_core.star_assigner import StarAssigner
 from star_core.star_gazer import StarGazer
 from star_core.ocr_gazer import OCRGazer, OCRResult, check_ocr_dependencies

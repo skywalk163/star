@@ -105,6 +105,17 @@ class DatabaseService:
             )
         """)
         
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS plugin_configs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                plugin_name TEXT NOT NULL UNIQUE,
+                enabled INTEGER DEFAULT 0,
+                config TEXT DEFAULT '{}',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+        """)
+        
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_audit_timestamp ON audit_logs(timestamp)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_audit_operation ON audit_logs(operation)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_task_status ON task_history(status)")
@@ -315,6 +326,56 @@ class DatabaseService:
                     VALUES (?, ?, ?, 1, ?, ?)
                 """, (agent_id, name, json.dumps(config, ensure_ascii=False), now, now))
                 return cur.lastrowid
+    
+    # ========== 插件配置 ==========
+    
+    def get_plugin_config(self, plugin_name: str) -> Optional[Dict]:
+        """获取插件配置"""
+        with self.get_cursor() as cur:
+            cur.execute("SELECT * FROM plugin_configs WHERE plugin_name = ?", (plugin_name,))
+            row = cur.fetchone()
+            if not row:
+                return None
+            d = dict(row)
+            if d.get('config'):
+                try:
+                    d['config'] = json.loads(d['config'])
+                except Exception:
+                    pass
+            return d
+    
+    def list_plugin_configs(self) -> List[Dict]:
+        """列出所有插件配置"""
+        with self.get_cursor() as cur:
+            cur.execute("SELECT * FROM plugin_configs")
+            rows = []
+            for row in cur.fetchall():
+                d = dict(row)
+                if d.get('config'):
+                    try:
+                        d['config'] = json.loads(d['config'])
+                    except Exception:
+                        pass
+                rows.append(d)
+            return rows
+    
+    def save_plugin_config(self, plugin_name: str, enabled: bool, config: Dict = None) -> None:
+        """保存插件配置"""
+        now = datetime.now().isoformat()
+        config_json = json.dumps(config or {}, ensure_ascii=False)
+        with self.get_cursor() as cur:
+            cur.execute("SELECT id FROM plugin_configs WHERE plugin_name = ?", (plugin_name,))
+            existing = cur.fetchone()
+            if existing:
+                cur.execute("""
+                    UPDATE plugin_configs SET enabled = ?, config = ?, updated_at = ?
+                    WHERE plugin_name = ?
+                """, (1 if enabled else 0, config_json, now, plugin_name))
+            else:
+                cur.execute("""
+                    INSERT INTO plugin_configs (plugin_name, enabled, config, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?)
+                """, (plugin_name, 1 if enabled else 0, config_json, now, now))
     
     # ========== 健康检查 ==========
     

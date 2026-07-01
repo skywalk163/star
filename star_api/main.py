@@ -7,16 +7,19 @@
 import asyncio
 import os
 import sys
+import time
 from contextlib import asynccontextmanager
 from typing import Optional
 
 import yaml
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from loguru import logger
+
+from star_core.observability import get_metrics_registry
 
 from star_api import state
 
@@ -107,7 +110,9 @@ async def lifespan(app: FastAPI):
     
     # 初始化插件管理器
     state.plugin_manager = PluginManager(plugin_dir="star_plugins")
-    logger.info(f"🔌 插件管理器就绪 - 发现 {len(state.plugin_manager.discover_plugins())} 个插件")
+    discovered = state.plugin_manager.discover_plugins()
+    state.plugin_manager.load_enabled_plugins_from_db()
+    logger.info(f"🔌 插件管理器就绪 - 发现 {len(discovered)} 个插件")
     
     # 初始化引擎（带插件管理器）
     state.orbit_engine = OrbitEngine(
@@ -156,6 +161,44 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# ==================== API 请求指标 ====================
+
+metrics = get_metrics_registry()
+request_counter = metrics.counter(
+    'http_requests_total',
+    'Total HTTP requests',
+    ['method', 'path', 'status']
+)
+request_duration = metrics.histogram(
+    'http_request_duration_seconds',
+    'HTTP request duration in seconds',
+    label_names=['method', 'path']
+)
+active_requests = metrics.gauge(
+    'http_active_requests',
+    'Active HTTP requests',
+    ['method', 'path']
+)
+
+
+@app.middleware("http")
+async def metrics_middleware(request: Request, call_next):
+    method = request.method
+    path = request.url.path
+    active_requests.inc(labels={'method': method, 'path': path})
+    start_time = time.time()
+    status = "500"
+    try:
+        response = await call_next(request)
+        status = str(response.status_code)
+        return response
+    finally:
+        duration = time.time() - start_time
+        request_counter.inc(labels={'method': method, 'path': path, 'status': status})
+        request_duration.observe(duration, labels={'method': method, 'path': path})
+        active_requests.dec(labels={'method': method, 'path': path})
 
 
 # ==================== WebSocket 广播 ====================
@@ -466,6 +509,7 @@ from star_api.routes.emissary import router as emissary_router
 from star_api.routes.config import router as config_router
 from star_api.routes.work import router as work_router
 from star_api.routes.remote import router as remote_router
+from star_api.routes.observability import router as observability_router
 
 app.include_router(stars_router, prefix="/api/stars", tags=["星体"])
 app.include_router(novas_router, prefix="/api/novas", tags=["新星"])
@@ -476,6 +520,7 @@ app.include_router(emissary_router, prefix="/api/emissary", tags=["星使交互"
 app.include_router(config_router)
 app.include_router(work_router)
 app.include_router(remote_router, prefix="/api/remote", tags=["远程控制"])
+app.include_router(observability_router, prefix="/api/observability", tags=["可观测性"])
 
 
 # ==================== 静态文件 & 控制面板 ====================

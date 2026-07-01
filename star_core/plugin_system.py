@@ -10,6 +10,7 @@
 
 import importlib
 import inspect
+import logging
 import pkgutil
 from typing import Optional, Type, Any
 from abc import ABC, abstractmethod
@@ -17,6 +18,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
 import sys
+
+logger = logging.getLogger(__name__)
 
 
 class PluginType(Enum):
@@ -239,6 +242,30 @@ class HookPlugin(ABC):
     def on_nova_fade(self, nova, reason: str) -> None:
         """新星失败时"""
         pass
+    
+    def on_star_discovered(self, star_body) -> None:
+        """星体发现时"""
+        pass
+    
+    def on_star_lost(self, star_body) -> None:
+        """星体丢失时"""
+        pass
+    
+    def on_constellation_create(self, constellation) -> None:
+        """星座创建时"""
+        pass
+    
+    def on_constellation_complete(self, constellation) -> None:
+        """星座完成时"""
+        pass
+    
+    def on_system_startup(self) -> None:
+        """系统启动时"""
+        pass
+    
+    def on_system_shutdown(self) -> None:
+        """系统关闭时"""
+        pass
 
 
 class PluginManager:
@@ -448,6 +475,75 @@ class PluginManager:
         if isinstance(plugin, HookPlugin):
             self._hook_plugins.append(plugin)
     
+    def _get_hook_mappings(self) -> dict:
+        """获取钩子方法名到 HookPoint 的映射"""
+        from star_core.plugin_hooks import HookPoint
+        
+        return {
+            'on_nova_create': HookPoint.NOVA_CREATE,
+            'on_nova_launch': HookPoint.NOVA_LAUNCH,
+            'on_nova_shine': HookPoint.NOVA_SHINE,
+            'on_starlight_received': HookPoint.STARLIGHT_RECEIVED,
+            'on_nova_complete': HookPoint.NOVA_COMPLETE,
+            'on_nova_fade': HookPoint.NOVA_FADE,
+            'on_star_discovered': HookPoint.STAR_DISCOVERED,
+            'on_star_lost': HookPoint.STAR_LOST,
+            'on_constellation_create': HookPoint.CONSTELLATION_CREATE,
+            'on_constellation_complete': HookPoint.CONSTELLATION_COMPLETE,
+            'on_system_startup': HookPoint.SYSTEM_STARTUP,
+            'on_system_shutdown': HookPoint.SYSTEM_SHUTDOWN,
+        }
+    
+    def _register_plugin_hooks(self, plugin_name: str, plugin):
+        """注册插件钩子到全局分发器"""
+        from star_core.plugin_hooks import get_hook_dispatcher
+        
+        dispatcher = get_hook_dispatcher()
+        hook_mappings = self._get_hook_mappings()
+        
+        for method_name, hook_point in hook_mappings.items():
+            if hasattr(plugin, method_name):
+                handler = getattr(plugin, method_name)
+                dispatcher.register(hook_point, handler)
+                logger.debug(f"Registered hook {hook_point.value} from plugin {plugin_name}")
+    
+    def _unregister_plugin_hooks(self, plugin_name: str, plugin):
+        """从全局分发器注销插件钩子"""
+        from star_core.plugin_hooks import get_hook_dispatcher
+        
+        dispatcher = get_hook_dispatcher()
+        hook_mappings = self._get_hook_mappings()
+        
+        for method_name, hook_point in hook_mappings.items():
+            if hasattr(plugin, method_name):
+                handler = getattr(plugin, method_name)
+                dispatcher.unregister(hook_point, handler)
+                logger.debug(f"Unregistered hook {hook_point.value} from plugin {plugin_name}")
+    
+    def _activate_plugin(self, plugin_name: str):
+        """激活插件"""
+        info = self._plugin_infos.get(plugin_name)
+        if not info:
+            return
+        info.status = PluginStatus.ACTIVE
+        info.error_message = None
+        
+        plugin = self._plugins.get(plugin_name)
+        if plugin and isinstance(plugin, HookPlugin):
+            self._register_plugin_hooks(plugin_name, plugin)
+
+    def _deactivate_plugin(self, plugin_name: str):
+        """停用插件"""
+        info = self._plugin_infos.get(plugin_name)
+        if not info:
+            return
+        
+        plugin = self._plugins.get(plugin_name)
+        if plugin and isinstance(plugin, HookPlugin):
+            self._unregister_plugin_hooks(plugin_name, plugin)
+        
+        info.status = PluginStatus.LOADED
+
     def enable_plugin(self, plugin_name: str) -> bool:
         """启用插件"""
         if plugin_name not in self._plugin_infos:
@@ -455,17 +551,101 @@ class PluginManager:
                 return False
         
         info = self._plugin_infos[plugin_name]
-        if info.status == PluginStatus.LOADED:
-            info.status = PluginStatus.ACTIVE
+        if info.status == PluginStatus.ACTIVE:
             return True
-        return info.status == PluginStatus.ACTIVE
+        
+        try:
+            self._activate_plugin(plugin_name)
+            
+            try:
+                from star_core.database import get_db_service
+                db = get_db_service()
+                existing_cfg = db.get_plugin_config(plugin_name)
+                config = existing_cfg.get('config', {}) if existing_cfg else {}
+                db.save_plugin_config(plugin_name, True, config)
+            except Exception as e:
+                logger.warning(f"Failed to save plugin config for {plugin_name}: {e}")
+            
+            return True
+        except Exception as e:
+            logger.error(f"Failed to enable plugin {plugin_name}: {e}")
+            info.status = PluginStatus.ERROR
+            info.error_message = str(e)
+            return False
     
     def disable_plugin(self, plugin_name: str) -> bool:
         """禁用插件"""
-        if plugin_name in self._plugin_infos:
-            self._plugin_infos[plugin_name].status = PluginStatus.DISABLED
+        if plugin_name not in self._plugin_infos:
+            return False
+        
+        info = self._plugin_infos[plugin_name]
+        if info.status != PluginStatus.ACTIVE:
             return True
-        return False
+        
+        try:
+            self._deactivate_plugin(plugin_name)
+            
+            try:
+                from star_core.database import get_db_service
+                db = get_db_service()
+                existing_cfg = db.get_plugin_config(plugin_name)
+                config = existing_cfg.get('config', {}) if existing_cfg else {}
+                db.save_plugin_config(plugin_name, False, config)
+            except Exception as e:
+                logger.warning(f"Failed to save plugin config for {plugin_name}: {e}")
+            
+            return True
+        except Exception as e:
+            logger.error(f"Failed to disable plugin {plugin_name}: {e}")
+            return False
+
+    def configure_plugin(self, plugin_name: str, config: dict) -> bool:
+        """配置插件"""
+        try:
+            if plugin_name in self._plugins:
+                plugin = self._plugins[plugin_name]
+                if hasattr(plugin, 'configure'):
+                    plugin.configure(config)
+            
+            try:
+                from star_core.database import get_db_service
+                db = get_db_service()
+                info = self._plugin_infos.get(plugin_name)
+                enabled = info.status == PluginStatus.ACTIVE if info else False
+                db.save_plugin_config(plugin_name, enabled, config)
+            except Exception as e:
+                logger.warning(f"Failed to save plugin config for {plugin_name}: {e}")
+            
+            return True
+        except Exception as e:
+            logger.error(f"Failed to configure plugin {plugin_name}: {e}")
+            return False
+
+    def get_plugin_config(self, plugin_name: str) -> dict:
+        """获取插件配置"""
+        try:
+            from star_core.database import get_db_service
+            db = get_db_service()
+            cfg = db.get_plugin_config(plugin_name)
+            return cfg.get('config', {}) if cfg else {}
+        except Exception as e:
+            logger.warning(f"Failed to get plugin config for {plugin_name}: {e}")
+            return {}
+
+    def load_enabled_plugins_from_db(self):
+        """从数据库加载已启用的插件"""
+        try:
+            from star_core.database import get_db_service
+            db = get_db_service()
+            configs = db.list_plugin_configs()
+            for cfg in configs:
+                if cfg.get('enabled'):
+                    try:
+                        self.enable_plugin(cfg['plugin_name'])
+                    except Exception as e:
+                        logger.warning(f"Failed to enable plugin {cfg['plugin_name']} from DB: {e}")
+        except Exception as e:
+            logger.warning(f"Failed to load enabled plugins from DB: {e}")
     
     def get_plugin(self, plugin_name: str) -> Optional[Any]:
         """获取插件实例"""

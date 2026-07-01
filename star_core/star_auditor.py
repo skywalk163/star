@@ -6,57 +6,14 @@
 
 import os
 import json
-import time
 import logging
 from typing import Optional, List, Dict
 from collections import deque
 from threading import Lock
-from datetime import datetime
+
+from star_core.models import AuditLogEntry
 
 logger = logging.getLogger(__name__)
-
-
-class AuditLogEntry:
-    """单条审计日志"""
-
-    def __init__(
-        self,
-        operation: str,
-        hwnd: Optional[int] = None,
-        params: Optional[dict] = None,
-        user: str = "default",
-        role: str = "admin",
-        result: str = "success",
-        detail: str = "",
-    ):
-        self.timestamp = time.time()
-        self.operation = operation
-        self.hwnd = hwnd
-        self.params = params or {}
-        self.user = user
-        self.role = role
-        self.result = result
-        self.detail = detail
-
-    def to_dict(self) -> dict:
-        return {
-            'timestamp': self.timestamp,
-            'time_str': datetime.fromtimestamp(self.timestamp).strftime('%Y-%m-%d %H:%M:%S'),
-            'operation': self.operation,
-            'hwnd': self.hwnd,
-            'params': self.params,
-            'user': self.user,
-            'role': self.role,
-            'result': self.result,
-            'detail': self.detail,
-        }
-
-    @property
-    def time_str(self) -> str:
-        return datetime.fromtimestamp(self.timestamp).strftime('%Y-%m-%d %H:%M:%S')
-
-    def __repr__(self):
-        return f"[{self.time_str}] {self.user}({self.role}) {self.operation} {'✓' if self.result == 'success' else '✗'}"
 
 
 class AuditLogger:

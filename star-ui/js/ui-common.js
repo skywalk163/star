@@ -293,4 +293,56 @@
         throttle: throttle,
     };
 
+    // 组件
+    window.UIComponents = {
+        Toast: window.Toast || null,
+        Modal: window.Modal || null,
+    };
+
+    // 全局事件总线
+    window.EventBus = {
+        _handlers: {},
+        
+        on: function(event, handler) {
+            if (!this._handlers[event]) {
+                this._handlers[event] = [];
+            }
+            this._handlers[event].push(handler);
+            return () => this.off(event, handler);
+        },
+        
+        off: function(event, handler) {
+            if (!this._handlers[event]) return;
+            const idx = this._handlers[event].indexOf(handler);
+            if (idx > -1) this._handlers[event].splice(idx, 1);
+        },
+        
+        emit: function(event, data) {
+            if (!this._handlers[event]) return;
+            for (const handler of this._handlers[event]) {
+                try {
+                    handler(data);
+                } catch (e) {
+                    console.error('EventBus handler error:', e);
+                }
+            }
+        },
+        
+        once: function(event, handler) {
+            const wrapper = (data) => {
+                handler(data);
+                this.off(event, wrapper);
+            };
+            this.on(event, wrapper);
+        },
+        
+        clear: function(event) {
+            if (event) {
+                delete this._handlers[event];
+            } else {
+                this._handlers = {};
+            }
+        }
+    };
+
 })();
