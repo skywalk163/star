@@ -328,3 +328,92 @@ class Constellation:
 - 输入模拟：只对指定窗口生效
 - 权限管理：建议以普通用户运行，仅必要时提权
 - API 安全：生产环境应启用认证（当前为开发模式）
+
+## v4 混合定位器交互架构（群星 v4）
+
+针对"无官方 API 的 AI Agent 软件"（Trae Work、DuMate、WorkBuddy、浏览器网页 AI），
+v4 引入 **混合定位器（Hybrid Locator）** 交互层：统一管理任务提交、输出读取与停止生成。
+
+### 定位器链（Locator Chain）
+
+| 定位器 | 技术 | 适用对象 | 兜底顺序 |
+|--------|------|----------|----------|
+| `uia` | Windows UI Automation 控件树 | 桌面应用（Trae/DuMate/WorkBuddy） | 1 |
+| `visual` | 截图 + OCR（PaddleOCR 可选） | 控件树不可读的自绘界面 | 2 |
+| `ratio` | 窗口坐标比例 | 一切桌面窗口终极兜底 | 3 |
+| `cdp` | Chrome DevTools Protocol DOM | 浏览器网页 AI（文心一言等） | 直达 |
+
+- 按 `config/ai-agents.yaml` 的 `interaction` 段配置逐个尝试，命中即返回元素盒
+  `ElementBox(x, y, width, height, confidence, source)`。
+- 无 `interaction` 段的旧 agent 自动回退纯 ratio 行为（向后兼容）。
+
+### 关键模块
+
+| 模块 | 职责 |
+|------|------|
+| `star_core/locators/` | 定位器基础包：base（抽象+链）/uia/visual/ratio/cdp + 注册表工厂 |
+| `star_core/cdp_bridge.py` | CDP 桥：/json 枚举标签页、WebSocket 执行 DOM 读写/按键，指数退避重建连接 |
+| `star_core/interaction.py` | InteractionSession：submit / stop_current / read_output 动作原语 |
+| `star_core/star_emissary.py` | 注入 interaction 会话；浏览器 agent 自动装配 CDP bridge 与 cdptab |
+| `star_api/routes/locators.py` | Web 定位器校准器：候选/检视/试发/预览/应用（热生效写回 yaml） |
+| `star_ui/pages/calibrator.html` | 校准器前端：截图+UIA 树点选生成定位配置 |
+
+### 停止任务语义
+
+**停止 = 停止当前生成，永不杀进程**：
+1. 优先点击 `interaction.stop` 按钮（UIA/CDP 文本查找）
+2. 兜底发送 `fallback_keys`（Esc / Ctrl_C）
+
+### 浏览器管控（CDP）
+
+- 以 `--remote-debugging-port=9222` 启动管控浏览器（Edge/Chrome），
+  profile 由 `scripts/launch_control_browser.ps1` 预置为独立用户数据目录。
+- `CDPBridge.find_tab(url_pattern)` 按 URL 匹配标签页；多标签页 → 多 StarBody 映射。
+- 提交：`set_value` 注入 + `dispatchKeyEvent(Enter)`；读取：`innerText`；停止：文本查找按钮/`Escape`。
+
+### 校准工作流（先探测、后落库）
+
+1. 打开 `/ui/pages/calibrator.html`，选取 agent 窗口
+2. `candidates` 探测能力 → `inspect` 截图 + UIA 树
+3. `probe` 按临时参数实测定位并真实注入测试文本（不回车，避免污染）
+4. `apply` 写回 `config/ai-agents.yaml`（自动备份 .bak，热生效）
+
+### 交互配置 Schema 示例
+
+```yaml
+interaction:
+  input:
+    locators: [uia, visual, ratio]   # 或 [cdp]（浏览器）
+    uia:
+      control_type: EditControl
+      automation_id: chat-input
+    cdp:                              # 浏览器专用
+      selector: "textarea#chat-input"
+    ratio:
+      x_ratio: 0.5
+      y_ratio: 0.92
+    send_on: Enter                    # 或 click + send_button
+  stop:
+    cancel_button:
+      cdp:
+        text_contains: "停止生成"
+    fallback_keys: [Esc]
+  output:
+    - type: log                       # 官方日志优先
+    - type: ocr
+      region: center_chat
+    - type: cdp
+      selector: ".chat-content"
+```
+
+### 遥测计划
+
+| 阶段 | 内容 |
+|------|------|
+| P0 | 定位器基础 + Trae 实测 + 停止功能（已完成，commit a49c844/28cd42b） |
+| P1 | Web 校准器 API + 前端（已完成，commit a253d80） |
+| P2 | CDP 桥 + 浏览器管控（已完成，commit 6b3a597） |
+| P3 | 多 agent 真机联调 + 测试补全（进行中） |
+
+> 全文设计见 `docs/superpowers/specs/2026-08-13-hybrid-locator-design.md`；
+> 实现计划见 `docs/superpowers/plans/2026-08-13-hybrid-locator.md`。

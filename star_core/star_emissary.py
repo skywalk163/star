@@ -737,15 +737,27 @@ class StarEmissary:
         
         # Interaction session
         self.interaction = interaction
+        self._cdp_bridge: Optional[Any] = None
+        self._cdp_url_pattern: Optional[str] = None
         if self.interaction is None:
             try:
                 from star_core.config_service import get_config_service
                 from star_core.interaction import InteractionSession
                 cfg_service = get_config_service()
+                # 浏览器 agent（category==browser 或带 cdp 段）自动注入 CDP bridge
+                agent_cfg = cfg_service.get_agent(star.star_type) or {}
+                cdp_cfg = agent_cfg.get("cdp") or {}
+                bridge = None
+                if cdp_cfg.get("url_pattern"):
+                    from star_core.cdp_bridge import CDPBridge
+                    port = int(cdp_cfg.get("port", 9222) or 9222)
+                    bridge = CDPBridge(port=port)
+                    self._cdp_bridge = bridge
+                    self._cdp_url_pattern = cdp_cfg.get("url_pattern")
                 ic = cfg_service.get_interaction_config(star.star_type)
                 if ic is not None:
                     self.interaction = InteractionSession(
-                        config=ic, bridge=None, ocr=self.ocr
+                        config=ic, bridge=bridge, ocr=self.ocr
                     )
             except Exception:
                 pass
@@ -763,6 +775,25 @@ class StarEmissary:
         self.on_status_change: Optional[Callable[[InteractionStatus], None]] = None
         self.on_progress: Optional[Callable[[str], None]] = None
     
+    def _build_interaction_ctx(self):
+        """构造交互上下文：桌面 agent 带 hwnd，浏览器 agent 自动装配 cdptab。"""
+        try:
+            from star_core.interaction import WindowContext
+        except ImportError:
+            return None
+        cdptab = None
+        if self._cdp_bridge is not None and self._cdp_url_pattern:
+            try:
+                cdptab = self._cdp_bridge.find_tab(self._cdp_url_pattern)
+            except Exception:
+                cdptab = None
+        return WindowContext(
+            hwnd=self.star.hwnd,
+            star=self.star,
+            cdptab=cdptab,
+            min_confidence=0.3,
+        )
+
     def _set_status(self, status: InteractionStatus):
         """设置状态并触发回调"""
         self.status = status
@@ -902,7 +933,7 @@ class StarEmissary:
         if self.interaction is not None:
             try:
                 from star_core.interaction import WindowContext, StopResult
-                ctx = WindowContext(hwnd=self.star.hwnd, star=self.star)
+                ctx = self._build_interaction_ctx()
                 result = self.interaction.stop_current(ctx)
                 if result.ok:
                     self._set_status(InteractionStatus.IDLE)
@@ -956,7 +987,7 @@ class StarEmissary:
         if self.interaction is not None:
             try:
                 from star_core.interaction import WindowContext
-                ctx = WindowContext(hwnd=self.star.hwnd, star=self.star)
+                ctx = self._build_interaction_ctx()
                 interaction_box = self.interaction.locate("input", ctx)
             except Exception:
                 interaction_box = None

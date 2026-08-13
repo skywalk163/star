@@ -206,6 +206,23 @@ python -m uvicorn star_api.main:app --reload --port 8765
 
 - **API 文档**：http://localhost:8765/docs
 - **健康检查**：http://localhost:8765/health
+- **校准器**：http://localhost:8765/ui/pages/calibrator.html（v4 混合定位器配置工具）
+- **星图控制面板**：http://localhost:8765/ui/pages/starmap.html
+
+### AI Agent 任务管控（v4）
+
+群星 v4 支持通过 Web 统一管理无官方 API 的 AI Agent 软件（Trae Work、DuMate、
+WorkBuddy、浏览器网页 AI）：
+
+| 能力 | 路径 |
+|------|------|
+| 提交任务 | `POST /api/stars/{pid}/send` 或 WebSocket 消息 |
+| 查看任务 | `GET /api/stars/{pid}/windows/{hwnd}/tasks`（官方日志优先，OCR 兜底） |
+| 停止生成 | `POST /api/stars/{pid}/stop`（停止当前生成，不杀进程） |
+| 定位器校准 | `GET/POST /api/locators/*` + 校准器前端页面 |
+
+交互由 `config/ai-agents.yaml` 的 `interaction` 段驱动（定位器链：UIA → 视觉 OCR →
+坐标比例 / 浏览器 CDP 直连）。详细设计见 `docs/architecture.md` 的 v4 章节。
 
 ### 快速体验
 
