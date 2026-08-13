@@ -222,54 +222,45 @@ class InteractionSession:
     # ----- Desktop operations (independent, not importing star_emissary) -----
 
     def _desktop_click(self, box: ElementBox, hwnd: int) -> bool:
-        """Click at ElementBox center using win32 API."""
+        """Click at ElementBox center using pyautogui (SendInput, Electron-safe)."""
         try:
-            import win32api
             import win32con
             import win32gui
+            import pyautogui
 
             win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
             try:
                 win32gui.SetForegroundWindow(hwnd)
             except Exception:
                 pass
-            time.sleep(0.15)
+            time.sleep(0.3)
+
+            # Close possible popups
+            pyautogui.press('escape')
+            time.sleep(0.2)
 
             cx = box.x + box.width // 2
             cy = box.y + box.height // 2
 
-            win32api.SetCursorPos((cx, cy))
-            time.sleep(0.05)
-            win32api.mouse_event(win32con.MOUSEEVENTF_LEFTDOWN, cx, cy, 0, 0)
-            time.sleep(0.05)
-            win32api.mouse_event(win32con.MOUSEEVENTF_LEFTUP, cx, cy, 0, 0)
-            time.sleep(0.1)
+            pyautogui.click(cx, cy)
+            time.sleep(0.6)
             return True
         except Exception as e:
             logger.debug(f"[Interaction] desktop_click failed: {e}")
             return False
 
     def _desktop_paste(self, text: str) -> bool:
-        """Paste text via clipboard + Ctrl+V."""
+        """Paste text via clipboard + Ctrl+V (pyautogui SendInput)."""
         try:
-            import win32api
-            import win32con
+            import pyautogui
             import pyperclip
 
             backup = pyperclip.paste()
             try:
                 pyperclip.copy(text)
                 time.sleep(0.05)
-                win32api.keybd_event(win32con.VK_CONTROL, 0, 0, 0)
-                time.sleep(0.02)
-                win32api.keybd_event(ord("V"), 0, 0, 0)
-                time.sleep(0.05)
-                win32api.keybd_event(ord("V"), 0, win32con.KEYEVENTF_KEYUP, 0)
-                time.sleep(0.02)
-                win32api.keybd_event(
-                    win32con.VK_CONTROL, 0, win32con.KEYEVENTF_KEYUP, 0
-                )
-                time.sleep(0.1)
+                pyautogui.hotkey('ctrl', 'v')
+                time.sleep(0.2)
                 return True
             finally:
                 pyperclip.copy(backup)
@@ -278,33 +269,20 @@ class InteractionSession:
             return False
 
     def _desktop_press_key(self, key: str) -> bool:
-        """Press a key. Supports Enter, Esc, Ctrl_C."""
+        """Press a key. Supports Enter, Esc, Ctrl_C (pyautogui SendInput)."""
         try:
-            import win32api
-            import win32con
+            import pyautogui
 
-            key_map = {
-                "Enter": win32con.VK_RETURN,
-                "Esc": win32con.VK_ESCAPE,
-            }
-
-            if key in key_map:
-                vk = key_map[key]
-                win32api.keybd_event(vk, 0, 0, 0)
-                time.sleep(0.05)
-                win32api.keybd_event(vk, 0, win32con.KEYEVENTF_KEYUP, 0)
+            if key == "Enter":
+                pyautogui.press('enter')
+                time.sleep(0.1)
+                return True
+            elif key == "Esc":
+                pyautogui.press('escape')
                 time.sleep(0.1)
                 return True
             elif key == "Ctrl_C":
-                win32api.keybd_event(win32con.VK_CONTROL, 0, 0, 0)
-                time.sleep(0.02)
-                win32api.keybd_event(ord("C"), 0, 0, 0)
-                time.sleep(0.05)
-                win32api.keybd_event(ord("C"), 0, win32con.KEYEVENTF_KEYUP, 0)
-                time.sleep(0.02)
-                win32api.keybd_event(
-                    win32con.VK_CONTROL, 0, win32con.KEYEVENTF_KEYUP, 0
-                )
+                pyautogui.hotkey('ctrl', 'c')
                 time.sleep(0.1)
                 return True
             return False

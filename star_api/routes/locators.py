@@ -164,8 +164,11 @@ def _walk_uia_tree(hwnd: int, max_nodes: int = 80) -> tuple[list[dict], bool]:
                 ctrl_type = ctrl.ControlTypeName or ""
                 auto_id = ctrl.AutomationId or ""
                 rect = ctrl.BoundingRectangle
-                # BoundingRectangle: (left, top, right, bottom)
-                rect_list = list(rect) if rect else [0, 0, 0, 0]
+                # BoundingRectangle 返回 uiautomation.Rect（不可迭代）
+                if rect:
+                    rect_list = [rect.left, rect.top, rect.right, rect.bottom]
+                else:
+                    rect_list = [0, 0, 0, 0]
 
                 nodes.append({
                     "name": name,
@@ -198,49 +201,52 @@ def _walk_uia_tree(hwnd: int, max_nodes: int = 80) -> tuple[list[dict], bool]:
 def _click_and_inject(hwnd: int, abs_x: int, abs_y: int, text: str) -> tuple[bool, str]:
     """
     在指定坐标点击并注入文本（不回车）。
-    复制自 star_emissary 的 _click_input_area + _paste_text 逻辑，不 import emissary。
+    使用 pyautogui (SendInput) 替代 win32 mouse_event/keybd_event，
+    因为 Electron/Chromium 渲染器不响应 Win32 事件但响应 SendInput。
     返回 (success, error_msg)。
     """
     try:
-        import win32api
         import win32con
+        import win32gui
+        import pyautogui
 
         # 激活窗口
         try:
-            import win32gui
             win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
             win32gui.SetForegroundWindow(hwnd)
         except Exception:
             pass
-        time.sleep(0.15)
+        time.sleep(0.3)
 
-        # 移动鼠标并点击
-        win32api.SetCursorPos((abs_x, abs_y))
-        time.sleep(0.05)
-        win32api.mouse_event(win32con.MOUSEEVENTF_LEFTDOWN, abs_x, abs_y, 0, 0)
-        time.sleep(0.05)
-        win32api.mouse_event(win32con.MOUSEEVENTF_LEFTUP, abs_x, abs_y, 0, 0)
+        # 先按 Escape 关闭可能的弹窗/覆盖层
+        pyautogui.press('escape')
+        time.sleep(0.2)
+
+        # 点击目标坐标（pyautogui 使用 SendInput）
+        pyautogui.click(abs_x, abs_y)
+        time.sleep(0.6)
+
+        # 清除可能残留的文本
+        pyautogui.hotkey('ctrl', 'a')
         time.sleep(0.1)
+        pyautogui.press('delete')
+        time.sleep(0.2)
 
-        # 剪贴板注入
+        # 剪贴板注入（支持中文）
         try:
             import pyperclip
             backup = pyperclip.paste()
             try:
                 pyperclip.copy(text)
                 time.sleep(0.05)
-                win32api.keybd_event(win32con.VK_CONTROL, 0, 0, 0)
-                time.sleep(0.02)
-                win32api.keybd_event(ord("V"), 0, 0, 0)
-                time.sleep(0.05)
-                win32api.keybd_event(ord("V"), 0, win32con.KEYEVENTF_KEYUP, 0)
-                time.sleep(0.02)
-                win32api.keybd_event(win32con.VK_CONTROL, 0, win32con.KEYEVENTF_KEYUP, 0)
-                time.sleep(0.1)
+                pyautogui.hotkey('ctrl', 'v')
+                time.sleep(0.2)
             finally:
                 pyperclip.copy(backup)
         except ImportError:
-            return False, "pyperclip not available"
+            # 无 pyperclip 时降级为逐字符输入（仅 ASCII）
+            pyautogui.typewrite(text, interval=0.05)
+            time.sleep(0.1)
 
         return True, ""
     except Exception as e:
@@ -279,8 +285,8 @@ def _build_locator_target(params: dict[str, Any]):
             ocr_min_confidence=visual_params.get("ocr_min_confidence", 0.5),
         ) if visual_params else None,
         ratio=RatioQuery(
-            x_ratio=ratio_params.get("x_ratio", 0.5),
-            y_ratio=ratio_params.get("y_ratio", 0.92),
+            x_ratio=ratio_params.get("x", ratio_params.get("x_ratio", 0.5)),
+            y_ratio=ratio_params.get("y", ratio_params.get("y_ratio", 0.92)),
         ) if ratio_params else None,
         cdp=CDPQuery(
             selector=cdp_params.get("selector"),
@@ -339,8 +345,9 @@ def _ratio_fallback_click(ratio_params: dict, hwnd: int) -> Optional[dict]:
         rect = win32gui.GetWindowRect(hwnd)
         left, top, right, bottom = rect
         w, h = right - left, bottom - top
-        x_ratio = ratio_params.get("x_ratio", 0.5)
-        y_ratio = ratio_params.get("y_ratio", 0.92)
+        # 兼容 yaml 的 x/y 和 dataclass 的 x_ratio/y_ratio 两种写法
+        x_ratio = ratio_params.get("x", ratio_params.get("x_ratio", 0.5))
+        y_ratio = ratio_params.get("y", ratio_params.get("y_ratio", 0.92))
         abs_x = int(left + w * x_ratio)
         abs_y = int(top + h * y_ratio)
         return {

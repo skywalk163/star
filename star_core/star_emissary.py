@@ -139,7 +139,7 @@ PRESET_ADAPTERS: dict[str, StarAdapterConfig] = {
     "trae": StarAdapterConfig(
         name="trae",
         input_click_x_ratio=0.5,
-        input_click_y_ratio=0.93,
+        input_click_y_ratio=0.88,
         output_region="center_chat",
         completion_strategy=CompletionStrategy.STATUS_KEYWORD,
         completion_keywords=[
@@ -818,26 +818,27 @@ class StarEmissary:
     def _click_input_area(self, box: Any = None) -> bool:
         """
         Click the input area to focus it.
-        
+
+        Uses pyautogui (SendInput) which is compatible with Electron/Chromium
+        renderers. The old win32 mouse_event was ignored by Electron apps.
+
         Args:
             box: ElementBox from locator. If provided, click at box center.
                  If None, use legacy ratio-based position.
-        
+
         Returns:
             True if click succeeded.
         """
         try:
-            import win32gui
-            import win32api
-            import win32con
-            
+            import pyautogui
+
             rect = self._get_window_rect()
             if not rect:
                 return False
-            
+
             left, top, right, bottom = rect
             w, h = right - left, bottom - top
-            
+
             if box is not None:
                 # Use locator box center (absolute screen coords)
                 abs_x = box.x + box.width // 2
@@ -847,73 +848,66 @@ class StarEmissary:
                 rel_x, rel_y = self.adapter.get_input_click_position(w, h)
                 abs_x = left + rel_x
                 abs_y = top + rel_y
-            
+
             # Activate window
             self.observatory.set_foreground_window(self.star.hwnd)
-            time.sleep(0.15)
-            
-            # Move mouse and click
-            win32api.SetCursorPos((abs_x, abs_y))
-            time.sleep(0.05)
-            win32api.mouse_event(win32con.MOUSEEVENTF_LEFTDOWN, abs_x, abs_y, 0, 0)
-            time.sleep(0.05)
-            win32api.mouse_event(win32con.MOUSEEVENTF_LEFTUP, abs_x, abs_y, 0, 0)
-            time.sleep(0.1)
-            
+            time.sleep(0.3)
+
+            # Close possible popups/overlays
+            pyautogui.press('escape')
+            time.sleep(0.2)
+
+            # Click via SendInput (Electron-compatible)
+            pyautogui.click(abs_x, abs_y)
+            time.sleep(0.6)
+
             return True
         except Exception:
             return False
-    
+
     def _paste_text(self, text: str) -> bool:
         """
         使用剪贴板粘贴文本到当前焦点
-        
+
+        Uses pyautogui.hotkey (SendInput) for Ctrl+V, which works with
+        Electron/Chromium input elements.
+
         Args:
             text: 要粘贴的文本
-            
+
         Returns:
             是否成功
         """
         try:
-            import win32api
-            import win32con
+            import pyautogui
             import pyperclip
-            
+
             # 备份剪贴板
             backup = pyperclip.paste()
-            
+
             try:
                 # 复制到剪贴板
                 pyperclip.copy(text)
                 time.sleep(0.05)
-                
-                # Ctrl+V 粘贴
-                win32api.keybd_event(win32con.VK_CONTROL, 0, 0, 0)
-                time.sleep(0.02)
-                win32api.keybd_event(ord('V'), 0, 0, 0)
-                time.sleep(0.05)
-                win32api.keybd_event(ord('V'), 0, win32con.KEYEVENTF_KEYUP, 0)
-                time.sleep(0.02)
-                win32api.keybd_event(win32con.VK_CONTROL, 0, win32con.KEYEVENTF_KEYUP, 0)
-                time.sleep(0.1)
-                
+
+                # Ctrl+V 粘贴 (SendInput)
+                pyautogui.hotkey('ctrl', 'v')
+                time.sleep(0.2)
+
                 return True
             finally:
                 # 恢复剪贴板
                 pyperclip.copy(backup)
-                
+
         except Exception:
             return False
-    
+
     def _press_enter(self) -> bool:
-        """Press the Enter key."""
+        """Press the Enter key via SendInput."""
         try:
-            import win32api
-            import win32con
-            
-            win32api.keybd_event(win32con.VK_RETURN, 0, 0, 0)
-            time.sleep(0.05)
-            win32api.keybd_event(win32con.VK_RETURN, 0, win32con.KEYEVENTF_KEYUP, 0)
+            import pyautogui
+
+            pyautogui.press('enter')
             time.sleep(0.1)
             return True
         except Exception:
@@ -942,15 +936,12 @@ class StarEmissary:
             except Exception:
                 pass
         
-        # Fallback: keyboard Esc
+        # Fallback: keyboard Esc (SendInput for Electron compatibility)
         try:
-            import win32api
-            import win32con
+            import pyautogui
             self.observatory.set_foreground_window(self.star.hwnd)
-            time.sleep(0.1)
-            win32api.keybd_event(win32con.VK_ESCAPE, 0, 0, 0)
-            time.sleep(0.05)
-            win32api.keybd_event(win32con.VK_ESCAPE, 0, win32con.KEYEVENTF_KEYUP, 0)
+            time.sleep(0.2)
+            pyautogui.press('escape')
             self._set_status(InteractionStatus.IDLE)
             from star_core.interaction import StopResult
             return StopResult(ok=True, via="keys")

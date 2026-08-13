@@ -55,7 +55,7 @@ agents:
           hint_text: "输入"
         ratio:
           x: 0.5
-          y: 0.93
+          y: 0.88
         send_on: Enter
       stop:
         fallback_keys:
