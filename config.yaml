@@ -8,6 +8,10 @@ auth:
     role: viewer
   enabled: true
   header_name: X-API-Key
+cdp:
+  port: 9222
+  profile: ~/.star/browser-profile
+  url_pattern: ""
 directories:
   data: data
   logs: logs
