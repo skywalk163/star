@@ -4,13 +4,47 @@
 提供星体发现、状态查询等接口
 """
 
-from typing import Optional
+from typing import Optional, Any
 from fastapi import APIRouter, HTTPException
 
 from star_api import state
 
 
 router = APIRouter()
+
+
+def _find_emissary(star_id: str) -> Optional[Any]:
+    """
+    Find an emissary by star_id.
+    
+    Searches state.emissaries and the emissary route cache.
+    
+    Args:
+        star_id: Star ID (typically PID as string).
+        
+    Returns:
+        StarEmissary instance or None.
+    """
+    # Try state.emissaries first
+    try:
+        emissaries = getattr(state, "emissaries", None)
+        if emissaries:
+            em = emissaries.get(star_id)
+            if em is not None:
+                return em
+    except Exception:
+        pass
+
+    # Try emissary route cache
+    try:
+        from star_api.routes.emissary import _emissary_cache
+        em = _emissary_cache.get(star_id)
+        if em is not None:
+            return em
+    except Exception:
+        pass
+
+    return None
 
 
 @router.get("/")
@@ -333,3 +367,37 @@ async def get_window_tasks(pid: int, hwnd: int):
         raise HTTPException(status_code=503, detail="OCR 模块未安装")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"任务列表获取失败: {str(e)}")
+
+
+@router.post("/{star_id}/stop")
+async def stop_star_generation(star_id: str):
+    """
+    Stop the current generation of a star.
+
+    Looks up the emissary for the given star_id and calls its
+    stop_current() method.  Returns ok/via/reason for diagnostics.
+
+    - 200: stop attempted (check ``ok`` field for success)
+    - 404: emissary not found
+    """
+    em = _find_emissary(star_id)
+    if em is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"emissary {star_id} not found",
+        )
+
+    try:
+        result = em.stop_current()
+    except Exception as exc:
+        return {"ok": False, "via": "", "reason": f"exception: {exc}"}
+
+    # stop_current may return a StopResult dataclass or a plain bool
+    if hasattr(result, "ok"):
+        return {
+            "ok": result.ok,
+            "via": getattr(result, "via", ""),
+            "reason": getattr(result, "reason", ""),
+        }
+    # Fallback: bool return
+    return {"ok": bool(result), "via": "", "reason": ""}

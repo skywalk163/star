@@ -13,16 +13,21 @@
 import time
 import re
 import uuid
-from typing import Optional, Callable, Awaitable
+from typing import Optional, Callable, Any, TYPE_CHECKING
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
+
+from loguru import logger
 
 from star_core.star_seeker import StarBody
 from star_core.star_assigner import StarAssigner, AssignStrategy
 from star_core.ocr_gazer import OCRGazer, OCRResult, TaskItem, PRESET_REGIONS
 from star_core.observatory import Observatory
 from star_core.log_reader import LogReader, get_reader
+
+if TYPE_CHECKING:
+    from star_core.interaction import InteractionSession
 
 
 class InteractionStatus(Enum):
@@ -691,23 +696,26 @@ class StarEmissary:
         assigner: Optional[StarAssigner] = None,
         ocr_gazer: Optional[OCRGazer] = None,
         observatory: Optional[Observatory] = None,
+        interaction: Optional[Any] = None,
     ):
         """
-        初始化星使
+        Initialize the emissary.
         
         Args:
-            star: 目标星体
-            adapter: 星体适配器（优先使用）
-            adapter_name: 适配器名称（预设）
-            assigner: 授星者（文本注入）
-            ocr_gazer: OCR 观星者（输出捕获）
-            observatory: 观星台
+            star: Target star body.
+            adapter: Star adapter (takes priority).
+            adapter_name: Adapter preset name.
+            assigner: Star assigner for text injection.
+            ocr_gazer: OCR gazer for output capture.
+            observatory: Observatory for window management.
+            interaction: InteractionSession for locator-based interaction.
+                If None, attempts to load from config_service.
         """
         self.star = star
         self.observatory = observatory or Observatory()
         self.assigner = assigner or StarAssigner(self.observatory)
         
-        # 适配器
+        # Adapter
         if adapter:
             self.adapter = adapter
         elif adapter_name:
@@ -726,6 +734,21 @@ class StarEmissary:
                 min_confidence=cfg.ocr_min_confidence,
                 use_incremental=cfg.use_incremental_ocr,
             )
+        
+        # Interaction session
+        self.interaction = interaction
+        if self.interaction is None:
+            try:
+                from star_core.config_service import get_config_service
+                from star_core.interaction import InteractionSession
+                cfg_service = get_config_service()
+                ic = cfg_service.get_interaction_config(star.star_type)
+                if ic is not None:
+                    self.interaction = InteractionSession(
+                        config=ic, bridge=None, ocr=self.ocr
+                    )
+            except Exception:
+                pass
         
         # 对话历史
         self.history: list[InteractionTurn] = []
@@ -757,36 +780,50 @@ class StarEmissary:
             return (right - left, bottom - top)
         return (1440, 900)
     
-    def _click_input_area(self) -> bool:
-        """点击输入区域"""
+    def _get_window_rect(self) -> Optional[tuple[int, int, int, int]]:
+        """Get window rect (left, top, right, bottom)."""
+        return self.observatory.get_window_rect(self.star.hwnd)
+    
+    def _click_input_area(self, box: Any = None) -> bool:
+        """
+        Click the input area to focus it.
+        
+        Args:
+            box: ElementBox from locator. If provided, click at box center.
+                 If None, use legacy ratio-based position.
+        
+        Returns:
+            True if click succeeded.
+        """
         try:
             import win32gui
             import win32api
             import win32con
             
-            # 获取窗口位置
-            rect = self.observatory.get_window_rect(self.star.hwnd)
+            rect = self._get_window_rect()
             if not rect:
                 return False
             
             left, top, right, bottom = rect
             w, h = right - left, bottom - top
             
-            # 计算点击位置
-            rel_x, rel_y = self.adapter.get_input_click_position(w, h)
-            abs_x = left + rel_x
-            abs_y = top + rel_y
+            if box is not None:
+                # Use locator box center (absolute screen coords)
+                abs_x = box.x + box.width // 2
+                abs_y = box.y + box.height // 2
+            else:
+                # Legacy ratio-based position
+                rel_x, rel_y = self.adapter.get_input_click_position(w, h)
+                abs_x = left + rel_x
+                abs_y = top + rel_y
             
-            # 激活窗口
+            # Activate window
             self.observatory.set_foreground_window(self.star.hwnd)
             time.sleep(0.15)
             
-            # 使用 win32api 发送鼠标点击
-            # 先移动鼠标
+            # Move mouse and click
             win32api.SetCursorPos((abs_x, abs_y))
             time.sleep(0.05)
-            
-            # 左键按下和释放
             win32api.mouse_event(win32con.MOUSEEVENTF_LEFTDOWN, abs_x, abs_y, 0, 0)
             time.sleep(0.05)
             win32api.mouse_event(win32con.MOUSEEVENTF_LEFTUP, abs_x, abs_y, 0, 0)
@@ -838,7 +875,7 @@ class StarEmissary:
             return False
     
     def _press_enter(self) -> bool:
-        """按下回车键"""
+        """Press the Enter key."""
         try:
             import win32api
             import win32con
@@ -851,19 +888,61 @@ class StarEmissary:
         except Exception:
             return False
     
+    def stop_current(self):
+        """
+        Stop current generation.
+        
+        When interaction session is available, delegates to
+        interaction.stop_current() (button priority, key fallback).
+        Otherwise, uses keyboard Esc as fallback.
+        
+        Returns:
+            StopResult with ok, via, and reason.
+        """
+        if self.interaction is not None:
+            try:
+                from star_core.interaction import WindowContext, StopResult
+                ctx = WindowContext(hwnd=self.star.hwnd, star=self.star)
+                result = self.interaction.stop_current(ctx)
+                if result.ok:
+                    self._set_status(InteractionStatus.IDLE)
+                    return result
+                # If interaction failed, fall through to keyboard fallback
+            except Exception:
+                pass
+        
+        # Fallback: keyboard Esc
+        try:
+            import win32api
+            import win32con
+            self.observatory.set_foreground_window(self.star.hwnd)
+            time.sleep(0.1)
+            win32api.keybd_event(win32con.VK_ESCAPE, 0, 0, 0)
+            time.sleep(0.05)
+            win32api.keybd_event(win32con.VK_ESCAPE, 0, win32con.KEYEVENTF_KEYUP, 0)
+            self._set_status(InteractionStatus.IDLE)
+            from star_core.interaction import StopResult
+            return StopResult(ok=True, via="keys")
+        except Exception:
+            from star_core.interaction import StopResult
+            return StopResult(ok=False, reason="esc_failed")
+    
     def send_prompt(self, prompt: str) -> bool:
         """
-        发送指令（不等待结果）
+        Send a prompt without waiting for response.
+        
+        When interaction session is available, uses locator chain to find
+        the input box. Falls back to legacy ratio-based click otherwise.
         
         Args:
-            prompt: 要发送的指令
+            prompt: Text to send.
             
         Returns:
-            是否发送成功
+            True if send succeeded.
         """
         self._set_status(InteractionStatus.SENDING)
         
-        # 创建轮次
+        # Create turn
         turn = InteractionTurn(
             turn_id=str(uuid.uuid4())[:8],
             prompt=prompt,
@@ -872,23 +951,33 @@ class StarEmissary:
         self._current_turn = turn
         self.history.append(turn)
         
-        # 1. 点击输入区域（获得焦点）
-        clicked = self._click_input_area()
+        # Try to locate input via interaction session
+        interaction_box = None
+        if self.interaction is not None:
+            try:
+                from star_core.interaction import WindowContext
+                ctx = WindowContext(hwnd=self.star.hwnd, star=self.star)
+                interaction_box = self.interaction.locate("input", ctx)
+            except Exception:
+                interaction_box = None
+        
+        # 1. Click input area (with box if located, legacy ratio otherwise)
+        clicked = self._click_input_area(box=interaction_box)
         if not clicked:
             self.observatory.set_foreground_window(self.star.hwnd)
             time.sleep(0.2)
         
-        # 2. 粘贴文本
+        # 2. Paste text
         pasted = self._paste_text(prompt)
         if not pasted:
-            # 备用方案：使用 StarAssigner
+            # Fallback: use StarAssigner
             pasted = self.assigner.send_starlight(
                 self.star,
                 prompt,
                 strategy_priority=self.adapter.config.inject_strategies,
             )
         
-        # 3. 按回车发送
+        # 3. Press enter
         if pasted and self.adapter.config.press_enter:
             self._press_enter()
         

@@ -45,6 +45,25 @@ agents:
       document: [".md", ".txt", ".docx", ".pdf", ".html"]
       preview: "(Preview)"
       work_mode: "TRAE Work"
+    interaction:
+      input:
+        locators: [uia, visual, ratio]
+        uia:
+          control_type: Edit
+          name_pattern: "输入|Ask|Message"
+        visual:
+          hint_text: "输入"
+        ratio:
+          x: 0.5
+          y: 0.93
+        send_on: Enter
+      stop:
+        fallback_keys:
+          - Esc
+      output:
+        - type: log
+          paths:
+            - "~/.trae-cn/log/**/*.log"
 
   - id: codearts_agent
     name: CodeArts Agent
@@ -191,6 +210,37 @@ agents:
       - yiyan
       - 文心
     alias_of: ernie
+
+  - id: browser_yiyan
+    name: 文心一言（CDP直连）
+    vendor: 百度
+    description: 百度文心一言浏览器CDP直连模式
+    category: browser
+    process_names:
+      - msedge.exe
+      - chrome.exe
+    window_class:
+      - Chrome_WidgetWin_1
+    title_patterns:
+      - 文心一言
+      - yiyan
+    cdp:
+      url_pattern: "yiyan.baidu.com"
+    interaction:
+      input:
+        locators: [cdp]
+        cdp:
+          selector: "textarea#chat-input"
+        send_on: Enter
+      stop:
+        cancel_button:
+          cdp:
+            text_contains: "停止生成"
+        fallback_keys:
+          - Esc
+      output:
+        - type: cdp
+          selector: ".chat-content"
 
   - id: spark
     name: 讯飞星火

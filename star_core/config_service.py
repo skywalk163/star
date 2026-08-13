@@ -24,6 +24,7 @@ class ConfigService:
         self.config_dir = config_dir
         self._agents_config: Dict[str, Any] = {}
         self._default_adapter_config: Dict[str, Any] = {}
+        self._interaction_configs: Dict[str, Any] = {}
         self._last_mtime = 0
         self._lock = threading.RLock()
         self.load()
@@ -60,6 +61,18 @@ class ConfigService:
         self._agents_config = agents_dict
         self._default_adapter_config = data.get('default_adapter_config', {})
         self._last_mtime = os.path.getmtime(yaml_path)
+        
+        # Parse interaction configs
+        self._interaction_configs = {}
+        for agent_id, agent in agents_dict.items():
+            interaction_data = agent.get('interaction')
+            if interaction_data:
+                try:
+                    ic = _parse_interaction_config(interaction_data)
+                    if ic is not None:
+                        self._interaction_configs[agent_id] = ic
+                except Exception as e:
+                    print(f"[ConfigService] Failed to parse interaction for {agent_id}: {e}")
     
     def reload_if_changed(self) -> bool:
         """如果配置文件变更则重新加载"""
@@ -132,6 +145,19 @@ class ConfigService:
         """获取默认适配器配置"""
         return dict(self._default_adapter_config)
     
+    def get_interaction_config(self, agent_id: str) -> Optional[Any]:
+        """
+        Get InteractionConfig for the specified agent.
+        
+        Args:
+            agent_id: Agent ID (e.g. "trae", "browser_yiyan").
+            
+        Returns:
+            InteractionConfig instance or None if not configured.
+        """
+        with self._lock:
+            return self._interaction_configs.get(agent_id)
+    
     # ========== 配置校验 ==========
     
     def validate_agent_config(self, agent_id: str) -> tuple:
@@ -159,3 +185,112 @@ def get_config_service() -> ConfigService:
     if _config_service is None:
         _config_service = ConfigService()
     return _config_service
+
+
+# ========== Interaction Config Parsing ==========
+
+def _parse_interaction_config(data: dict) -> Optional[Any]:
+    """
+    Parse interaction section from yaml dict into InteractionConfig.
+    
+    Uses lazy import of star_core.interaction to avoid circular dependency.
+    """
+    try:
+        from star_core.interaction import (
+            InteractionConfig,
+            LocatorTarget,
+            UIAQuery,
+            VisualQuery,
+            RatioQuery,
+            CDPQuery,
+        )
+    except ImportError:
+        return None
+
+    input_data = data.get("input", {})
+
+    # Build input LocatorTarget
+    input_target = _build_locator_target("input", input_data)
+
+    # Build send_button LocatorTarget
+    send_button = None
+    send_button_data = input_data.get("send_button")
+    if send_button_data:
+        send_button = _build_locator_target("send_button", send_button_data)
+
+    # Build stop LocatorTarget from stop.cancel_button
+    stop = None
+    stop_data = data.get("stop", {})
+    cancel_button_data = stop_data.get("cancel_button")
+    if cancel_button_data:
+        stop = _build_locator_target("stop_button", cancel_button_data)
+
+    # stop_fallback_keys
+    fallback_keys = stop_data.get("fallback_keys", [])
+
+    # output
+    output = data.get("output", [])
+
+    # locators order
+    locators = input_data.get("locators", [])
+
+    # send_on
+    send_on = input_data.get("send_on", "Enter")
+
+    return InteractionConfig(
+        locators=locators,
+        input=input_target,
+        send_on=send_on,
+        send_button=send_button,
+        stop=stop,
+        stop_fallback_keys=fallback_keys,
+        output=output,
+    )
+
+
+def _build_locator_target(kind: str, data: dict) -> Any:
+    """Build LocatorTarget from yaml dict."""
+    from star_core.interaction import (
+        LocatorTarget,
+        UIAQuery,
+        VisualQuery,
+        RatioQuery,
+        CDPQuery,
+    )
+
+    target = LocatorTarget(kind=kind)
+
+    if "uia" in data:
+        uia_data = data["uia"]
+        target.uia = UIAQuery(
+            control_type=uia_data.get("control_type"),
+            automation_id=uia_data.get("automation_id"),
+            name_regex=uia_data.get("name_pattern") or uia_data.get("name_regex"),
+            depth_limit=uia_data.get("depth_limit", 8),
+        )
+
+    if "visual" in data:
+        vis_data = data["visual"]
+        target.visual = VisualQuery(
+            hint_text=vis_data.get("hint_text"),
+            template=vis_data.get("template"),
+            region=vis_data.get("region", "full_window"),
+            ocr_min_confidence=vis_data.get("ocr_min_confidence", 0.5),
+        )
+
+    if "ratio" in data:
+        ratio_data = data["ratio"]
+        target.ratio = RatioQuery(
+            x_ratio=ratio_data.get("x", ratio_data.get("x_ratio", 0.5)),
+            y_ratio=ratio_data.get("y", ratio_data.get("y_ratio", 0.92)),
+        )
+
+    if "cdp" in data:
+        cdp_data = data["cdp"]
+        target.cdp = CDPQuery(
+            selector=cdp_data.get("selector"),
+            text_contains=cdp_data.get("text_contains"),
+            role=cdp_data.get("role"),
+        )
+
+    return target
