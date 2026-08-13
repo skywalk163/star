@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>定位器校准器 — 群星 Star</title>
+    <style id="theme-vars">
+:root {
+  --color-bg-deep: #0a0e27;
+  --color-bg-panel: #1a1f3a;
+  --color-bg-card: #151934;
+  --color-bg-elevated: #212647;
+  --color-bg-hover: #2a3058;
+  --color-primary: #ffd700;
+  --color-primary-dim: rgba(255, 215, 0, 0.15);
+  --color-primary-muted: rgba(255, 215, 0, 0.6);
+  --color-primary-glow: rgba(255, 215, 0, 0.25);
+  --color-status-shining: #66bb6a;
+  --color-status-awaiting: #ffa726;
+  --color-status-faded: #ef5350;
+  --color-text-primary: #e8eaf6;
+  --color-text-secondary: #9fa8da;
+  --color-text-muted: #616885;
+  --color-text-gold: #ffd700;
+  --color-border: rgba(255, 255, 255, 0.08);
+  --color-border-glow: rgba(255, 215, 0, 0.2);
+  --color-accent: #f59e0b;
+  --color-error: #ef4444;
+  --color-success: #10b981;
+  --font-display: 'Inter', 'Noto Sans SC', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --space-sm: 8px;
+  --space-md: 12px;
+  --space-lg: 16px;
+  --space-xl: 24px;
+}
+    </style>
+    <script src="/ui/js/api-bridge.js"></script>
+    <script src="/ui/js/nav.js"></script>
+    <style>
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body {
+        background: var(--color-bg-deep);
+        color: var(--color-text-primary);
+        font-family: var(--font-display);
+        height: 100vh;
+        overflow: hidden;
+      }
+      .no-scrollbar::-webkit-scrollbar { width: 4px; }
+      .no-scrollbar::-webkit-scrollbar-track { background: transparent; }
+      .no-scrollbar::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 2px; }
+
+      .app { display: flex; flex-direction: column; height: 100vh; }
+
+      /* 顶部状态横幅 */
+      .status-banner {
+        padding: 6px 16px;
+        font-size: 12px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        transition: all 0.3s;
+      }
+      .status-banner.online {
+        background: rgba(16, 185, 129, 0.1);
+        color: var(--color-success);
+        border-bottom: 1px solid rgba(16, 185, 129, 0.2);
+      }
+      .status-banner.offline {
+        background: rgba(239, 68, 68, 0.1);
+        color: var(--color-error);
+        border-bottom: 1px solid rgba(239, 68, 68, 0.2);
+      }
+      .status-dot {
+        width: 8px; height: 8px; border-radius: 50%;
+        flex-shrink: 0;
+      }
+      .online .status-dot { background: var(--color-success); box-shadow: 0 0 6px var(--color-success); }
+      .offline .status-dot { background: var(--color-error); }
+
+      /* 主体布局 */
+      .body { display: flex; flex: 1; overflow: hidden; }
+
+      /* 左栏：候选列表 */
+      .sidebar {
+        width: 260px; flex-shrink: 0;
+        background: var(--color-bg-panel);
+        border-right: 1px solid var(--color-border);
+        display: flex; flex-direction: column;
+      }
+      .sidebar-header {
+        padding: var(--space-lg);
+        border-bottom: 1px solid var(--color-border);
+      }
+      .sidebar-title {
+        font-size: 14px; font-weight: 600;
+        color: var(--color-text-primary);
+        display: flex; align-items: center; gap: 8px;
+      }
+      .sidebar-subtitle {
+        font-size: 11px; color: var(--color-text-muted);
+        margin-top: 4px;
+      }
+      .sidebar-list {
+        flex: 1; overflow-y: auto;
+        padding: var(--space-sm);
+      }
+
+      .candidate-item {
+        padding: 10px 12px;
+        border-radius: var(--radius-md);
+        cursor: pointer;
+        transition: background 0.2s;
+        margin-bottom: 4px;
+        border: 1px solid transparent;
+      }
+      .candidate-item:hover { background: var(--color-bg-hover); }
+      .candidate-item.active {
+        background: var(--color-primary-dim);
+        border-color: var(--color-border-glow);
+      }
+      .candidate-name {
+        font-size: 13px; font-weight: 500;
+        color: var(--color-text-primary);
+        margin-bottom: 4px;
+      }
+      .candidate-pid {
+        font-size: 11px; color: var(--color-text-muted);
+        font-family: var(--font-mono);
+      }
+      .candidate-caps {
+        display: flex; gap: 4px; margin-top: 4px;
+      }
+      .cap-badge {
+        font-size: 9px;
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-family: var(--font-mono);
+        text-transform: uppercase;
+      }
+      .cap-badge.on {
+        background: rgba(16, 185, 129, 0.15);
+        color: var(--color-success);
+      }
+      .cap-badge.off {
+        background: rgba(97, 104, 133, 0.15);
+        color: var(--color-text-muted);
+      }
+
+      /* 中栏：截图 + 动作区 */
+      .main {
+        flex: 1; display: flex; flex-direction: column;
+        overflow: hidden;
+      }
+      .main-header {
+        padding: var(--space-lg) var(--space-xl);
+        border-bottom: 1px solid var(--color-border);
+        display: flex; align-items: center; justify-content: space-between;
+      }
+      .main-title {
+        font-size: 16px; font-weight: 600;
+        display: flex; align-items: center; gap: 8px;
+      }
+
+      .screenshot-area {
+        flex: 1;
+        display: flex; align-items: center; justify-content: center;
+        padding: var(--space-lg);
+        overflow: auto;
+        position: relative;
+      }
+      .screenshot-container {
+        position: relative;
+        max-width: 100%; max-height: 100%;
+        border-radius: var(--radius-lg);
+        overflow: hidden;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+        border: 1px solid var(--color-border);
+      }
+      .screenshot-img {
+        display: block;
+        max-width: 100%;
+        max-height: calc(100vh - 280px);
+        cursor: crosshair;
+      }
+      .screenshot-overlay {
+        position: absolute; top: 0; left: 0;
+        width: 100%; height: 100%;
+        pointer-events: none;
+      }
+      .highlight-box {
+        position: absolute;
+        border: 2px solid #ef4444;
+        border-radius: 4px;
+        background: rgba(239, 68, 68, 0.1);
+        pointer-events: auto;
+        cursor: pointer;
+        transition: all 0.15s;
+      }
+      .highlight-box:hover {
+        background: rgba(239, 68, 68, 0.2);
+        border-width: 3px;
+      }
+      .screenshot-placeholder {
+        color: var(--color-text-muted);
+        text-align: center;
+      }
+      .screenshot-placeholder p { font-size: 14px; margin-top: 12px; }
+
+      /* 右栏：UIA 树 + 参数 + 动作 */
+      .right-panel {
+        width: 340px; flex-shrink: 0;
+        background: var(--color-bg-panel);
+        border-left: 1px solid var(--color-border);
+        display: flex; flex-direction: column;
+        overflow: hidden;
+      }
+      .panel-section {
+        border-bottom: 1px solid var(--color-border);
+        padding: var(--space-lg);
+      }
+      .panel-section-title {
+        font-size: 12px; font-weight: 600;
+        color: var(--color-text-secondary);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: var(--space-md);
+      }
+      .uia-tree {
+        max-height: 260px;
+        overflow-y: auto;
+      }
+      .uia-node {
+        padding: 4px 8px;
+        font-size: 12px;
+        color: var(--color-text-secondary);
+        cursor: pointer;
+        border-radius: 4px;
+        transition: background 0.15s;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        font-family: var(--font-mono);
+      }
+      .uia-node:hover { background: var(--color-bg-hover); color: var(--color-text-primary); }
+      .uia-node.active { background: var(--color-primary-dim); color: var(--color-primary); }
+      .uia-node .uia-type {
+        color: var(--color-text-muted);
+        font-size: 11px;
+      }
+
+      .param-form { display: flex; flex-direction: column; gap: 8px; }
+      .form-row { display: flex; flex-direction: column; gap: 4px; }
+      .form-label {
+        font-size: 11px; color: var(--color-text-muted);
+      }
+      .form-input {
+        padding: 6px 10px;
+        background: var(--color-bg-card);
+        border: 1px solid var(--color-border);
+        border-radius: 6px;
+        color: var(--color-text-primary);
+        font-size: 12px;
+        font-family: var(--font-mono);
+        outline: none;
+        width: 100%;
+      }
+      .form-input:focus { border-color: var(--color-primary); }
+      .form-grid-2 {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+      }
+
+      .action-buttons {
+        display: flex; flex-wrap: wrap; gap: 8px;
+        padding: var(--space-lg);
+        border-top: 1px solid var(--color-border);
+      }
+      .btn {
+        display: inline-flex; align-items: center; gap: 6px;
+        padding: 8px 14px;
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius-md);
+        background: var(--color-bg-elevated);
+        color: var(--color-text-primary);
+        font-size: 13px;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+      .btn:hover { background: var(--color-bg-hover); border-color: var(--color-border-glow); }
+      .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+      .btn-primary {
+        background: var(--color-primary);
+        color: #1a1f3a;
+        border-color: var(--color-primary);
+        font-weight: 500;
+      }
+      .btn-primary:hover { opacity: 0.9; }
+      .btn-accent {
+        background: var(--color-accent);
+        color: #1a1f3a;
+        border-color: var(--color-accent);
+        font-weight: 500;
+      }
+      .btn-accent:hover { opacity: 0.85; }
+      .btn-danger {
+        background: rgba(239, 68, 68, 0.15);
+        color: var(--color-error);
+        border-color: rgba(239, 68, 68, 0.3);
+      }
+      .btn-danger:hover { background: rgba(239, 68, 68, 0.25); }
+      .btn-sm { padding: 5px 10px; font-size: 12px; }
+
+      .prompt-input {
+        width: 100%;
+        min-height: 44px;
+        padding: 8px 10px;
+        background: var(--color-bg-card);
+        border: 1px solid var(--color-border);
+        border-radius: 6px;
+        color: var(--color-text-primary);
+        font-size: 12px;
+        font-family: var(--font-display);
+        resize: vertical;
+        outline: none;
+      }
+      .prompt-input:focus { border-color: var(--color-primary); }
+
+      .preview-area {
+        background: var(--color-bg-card);
+        border: 1px solid var(--color-border);
+        border-radius: 6px;
+        padding: 10px;
+        font-family: var(--font-mono);
+        font-size: 11px;
+        color: var(--color-text-secondary);
+        white-space: pre-wrap;
+        max-height: 120px;
+        overflow-y: auto;
+        margin-top: 8px;
+      }
+
+      .loading {
+        display: inline-block;
+        width: 14px; height: 14px;
+        border: 2px solid var(--color-border);
+        border-top-color: var(--color-primary);
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+      }
+      @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+    <div class="app">
+      <!-- 状态横幅 -->
+      <div class="status-banner offline" id="statusBanner">
+        <span class="status-dot"></span>
+        <span id="statusText">正在连接后端...</span>
+      </div>
+
+      <div class="body">
+        <!-- 左栏：候选列表 -->
+        <aside class="sidebar">
+          <div class="sidebar-header">
+            <div class="sidebar-title">&#9881; 候选 Agent</div>
+            <div class="sidebar-subtitle">选择一个 agent 开始校准</div>
+          </div>
+          <div class="sidebar-list no-scrollbar" id="candidateList">
+            <div style="padding:20px;text-align:center;color:var(--color-text-muted);">
+              <div class="loading" style="margin-bottom:10px;"></div>
+              加载中...
+            </div>
+          </div>
+        </aside>
+
+        <!-- 中栏：截图 -->
+        <main class="main">
+          <div class="main-header">
+            <div class="main-title" id="mainTitle">
+              <span>定位器校准器 / Locator Calibrator</span>
+            </div>
+            <div style="font-size:12px;color:var(--color-text-muted);">
+              点击截图选取元素 / 点击 UIA 树节点联动高亮
+            </div>
+          </div>
+
+          <div class="screenshot-area" id="screenshotArea">
+            <div class="screenshot-placeholder">
+              <p>&#128269; 从左侧选择一个 agent 开始检视</p>
+            </div>
+          </div>
+        </main>
+
+        <!-- 右栏：UIA 树 + 参数 + 动作 -->
+        <aside class="right-panel no-scrollbar" style="overflow-y:auto;">
+          <!-- UIA 树 -->
+          <div class="panel-section">
+            <div class="panel-section-title">UIA 控件树</div>
+            <div class="uia-tree no-scrollbar" id="uiaTree">
+              <div style="color:var(--color-text-muted);font-size:12px;">选择 agent 后显示控件树</div>
+            </div>
+          </div>
+
+          <!-- 参数表单 -->
+          <div class="panel-section">
+            <div class="panel-section-title">定位参数</div>
+            <div class="param-form">
+              <div class="form-row">
+                <label class="form-label">定位器优先级 (逗号分隔)</label>
+                <input class="form-input" id="locOrder" value="uia,visual,ratio" placeholder="uia,visual,ratio">
+              </div>
+              <div class="form-row">
+                <label class="form-label">UIA: control_type</label>
+                <input class="form-input" id="uiaControlType" placeholder="Edit / Button / ...">
+              </div>
+              <div class="form-row">
+                <label class="form-label">UIA: automation_id</label>
+                <input class="form-input" id="uiaAutomationId" placeholder="">
+              </div>
+              <div class="form-row">
+                <label class="form-label">UIA: name_regex</label>
+                <input class="form-input" id="uiaNameRegex" placeholder="输入|Ask|Message">
+              </div>
+              <div class="form-row">
+                <label class="form-label">Visual: hint_text</label>
+                <input class="form-input" id="visualHintText" placeholder="输入">
+              </div>
+              <div class="form-grid-2">
+                <div class="form-row">
+                  <label class="form-label">Ratio: x</label>
+                  <input class="form-input" id="ratioX" type="number" step="0.01" value="0.5">
+                </div>
+                <div class="form-row">
+                  <label class="form-label">Ratio: y</label>
+                  <input class="form-input" id="ratioY" type="number" step="0.01" value="0.92">
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 试发输入 -->
+          <div class="panel-section">
+            <div class="panel-section-title">试发测试</div>
+            <textarea class="prompt-input" id="probePrompt" placeholder="输入测试文本...">calibrator test</textarea>
+          </div>
+
+          <!-- 配置预览 -->
+          <div class="panel-section" id="previewSection" style="display:none;">
+            <div class="panel-section-title">配置预览 (YAML)</div>
+            <div class="preview-area no-scrollbar" id="previewArea"></div>
+          </div>
+
+          <!-- 动作按钮 -->
+          <div class="action-buttons">
+            <button class="btn btn-accent btn-sm" id="probeBtn" onclick="doProbe()" disabled>
+              &#9654; 试发测试
+            </button>
+            <button class="btn btn-sm" id="previewBtn" onclick="doPreview()" disabled>
+              &#128196; 生成配置
+            </button>
+            <button class="btn btn-primary btn-sm" id="applyBtn" onclick="doApply()" disabled>
+              &#9989; 应用生效
+            </button>
+            <button class="btn btn-danger btn-sm" onclick="doClear()">
+              &#128465; 清空
+            </button>
+          </div>
+        </aside>
+      </div>
+    </div>
+
+    <script src="/ui/js/calibrator.js"></script>
+</body>
+</html>

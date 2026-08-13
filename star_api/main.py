@@ -510,6 +510,7 @@ from star_api.routes.config import router as config_router
 from star_api.routes.work import router as work_router
 from star_api.routes.remote import router as remote_router
 from star_api.routes.observability import router as observability_router
+from star_api.routes.locators import router as locators_router
 
 app.include_router(stars_router, prefix="/api/stars", tags=["星体"])
 app.include_router(novas_router, prefix="/api/novas", tags=["新星"])
@@ -521,6 +522,7 @@ app.include_router(config_router)
 app.include_router(work_router)
 app.include_router(remote_router, prefix="/api/remote", tags=["远程控制"])
 app.include_router(observability_router, prefix="/api/observability", tags=["可观测性"])
+app.include_router(locators_router, prefix="/api/locators", tags=["定位器校准"])
 
 
 # ==================== 静态文件 & 控制面板 ====================
