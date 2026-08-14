@@ -304,6 +304,70 @@ const workApi = {
   }),
 };
 
+// ==================== DuMate API (搭子桥) ====================
+const dumateApi = {
+  discover: () => apiFetch('/api/dumate/discover'),
+  status: () => apiFetch('/api/dumate/status'),
+  bridgeStatus: () => apiFetch('/api/dumate/bridge/status'),
+  listTasks: () => apiFetch('/api/dumate/tasks'),
+  activeTasks: () => apiFetch('/api/dumate/tasks/active'),
+  getTask: (taskId) => apiFetch('/api/dumate/tasks/' + taskId),
+  getTaskContent: (taskId) => apiFetch('/api/dumate/tasks/' + taskId + '/content'),
+  getTaskLog: (taskId) => apiFetch('/api/dumate/tasks/' + taskId + '/log'),
+  listTaskTypes: () => apiFetch('/api/dumate/task-types'),
+  listConversations: () => apiFetch('/api/dumate/conversations'),
+  listWorkspaces: () => apiFetch('/api/dumate/workspaces'),
+  createTask: (prompt, opts) => {
+    const { agentName, workspaceId, taskType } = opts || {};
+    return apiFetch('/api/dumate/tasks/create', {
+      method: 'POST',
+      body: JSON.stringify({
+        prompt,
+        agent_name: agentName || 'Comate',
+        workspace_id: workspaceId || '',
+        task_type: taskType || 'work',
+      }),
+    });
+  },
+  stopTask: (taskId) => apiFetch('/api/dumate/tasks/' + taskId + '/stop', {
+    method: 'POST',
+  }),
+  // 会话输出内容（实时轮询）
+  getConversationOutput: (convId, maxLines) =>
+    apiFetch(`/api/dumate/conversations/${convId}/output?max_lines=${maxLines || 200}`),
+  // SSE 事件流
+  streamUrl: () => '/api/dumate/stream',
+  streamSessionUrl: (convId) => '/api/dumate/stream/session/' + convId,
+};
+
+// ==================== Adapter API (统一 AI 适配器) ====================
+// 通用适配器接口：DuMate / Trae Work 等任意已注册适配器共用同一套路由，
+// 前端据此提供统一的连接入口与任务派发，而不必为每个适配器单独写 UI。
+const adapterApi = {
+  list: () => apiFetch('/api/dumate/adapters'),
+  connect: (aiId) => apiFetch(`/api/dumate/adapters/${aiId}/connect`, { method: 'POST' }),
+  disconnect: (aiId) => apiFetch(`/api/dumate/adapters/${aiId}/disconnect`, { method: 'POST' }),
+  restart: (aiId) => apiFetch(`/api/dumate/adapters/${aiId}/restart`, { method: 'POST' }),
+  setDefault: (aiId) => apiFetch(`/api/dumate/adapters/${aiId}/default`, { method: 'POST' }),
+  status: (aiId) => apiFetch(`/api/dumate/adapters/${aiId}/status`),
+  createTask: (aiId, prompt, opts) => {
+    const { workspaceId, taskType } = opts || {};
+    return apiFetch(`/api/dumate/adapters/${aiId}/tasks`, {
+      method: 'POST',
+      body: JSON.stringify({
+        prompt,
+        workspace_id: workspaceId || '',
+        task_type: taskType || 'work',
+      }),
+    });
+  },
+  stopTask: (aiId, taskId) =>
+    apiFetch(`/api/dumate/adapters/${aiId}/tasks/${taskId}/stop`, { method: 'POST' }),
+  // 适配器无关的会话输出轮询（DuMate 走 .output 映射；Trae 读最新响应）
+  getOutput: (aiId, convId, maxLines) =>
+    apiFetch(`/api/dumate/adapters/${aiId}/tasks/${convId}/output?max_lines=${maxLines || 200}`),
+};
+
 // ==================== Remote API (远程控制) ====================
 const remoteApi = {
   getScreenshotUrl: (hwnd, force = false) =>

@@ -739,6 +739,7 @@ class StarEmissary:
         self.interaction = interaction
         self._cdp_bridge: Optional[Any] = None
         self._cdp_url_pattern: Optional[str] = None
+        self._trae_cdp: Optional[Any] = None
         if self.interaction is None:
             try:
                 from star_core.config_service import get_config_service
@@ -754,6 +755,12 @@ class StarEmissary:
                     bridge = CDPBridge(port=port)
                     self._cdp_bridge = bridge
                     self._cdp_url_pattern = cdp_cfg.get("url_pattern")
+                # Electron agent（如 Trae）注入 TraeCDPBridge
+                elif cdp_cfg.get("type") == "electron" and cdp_cfg.get("port"):
+                    from star_core.trae_cdp_bridge import TraeCDPBridge
+                    port = int(cdp_cfg.get("port", 9223) or 9223)
+                    self._trae_cdp = TraeCDPBridge(port=port)
+                    logger.debug(f"[星使] TraeCDPBridge 已注入 (port={port})")
                 ic = cfg_service.get_interaction_config(star.star_type)
                 if ic is not None:
                     self.interaction = InteractionSession(
@@ -917,13 +924,22 @@ class StarEmissary:
         """
         Stop current generation.
         
-        When interaction session is available, delegates to
-        interaction.stop_current() (button priority, key fallback).
-        Otherwise, uses keyboard Esc as fallback.
+        Priority: TraeCDP > interaction session > keyboard Esc.
         
         Returns:
             StopResult with ok, via, and reason.
         """
+        # 优先路径: TraeCDP（如果可用且活跃）
+        if self._trae_cdp is not None and self._trae_cdp.is_alive():
+            try:
+                if self._trae_cdp.stop_generation():
+                    self._set_status(InteractionStatus.IDLE)
+                    from star_core.interaction import StopResult
+                    return StopResult(ok=True, via="cdp")
+            except Exception:
+                pass
+        
+        # 降级路径 1: interaction session
         if self.interaction is not None:
             try:
                 from star_core.interaction import WindowContext, StopResult
@@ -973,6 +989,22 @@ class StarEmissary:
         self._current_turn = turn
         self.history.append(turn)
         
+        # 优先路径: TraeCDP（如果可用且活跃）
+        if self._trae_cdp is not None and self._trae_cdp.is_alive():
+            try:
+                ok = self._trae_cdp.send_message(prompt)
+                if ok:
+                    turn.status = InteractionStatus.WAITING
+                    self._set_status(InteractionStatus.WAITING)
+                    self._last_text = ""
+                    self._stable_count = 0
+                    time.sleep(self.adapter.config.send_delay)
+                    return True
+                logger.warning("[星使] TraeCDP 发送失败，降级到 GUI 自动化")
+            except Exception as e:
+                logger.warning(f"[星使] TraeCDP 异常: {e}，降级到 GUI 自动化")
+        
+        # 降级路径: GUI 自动化
         # Try to locate input via interaction session
         interaction_box = None
         if self.interaction is not None:
@@ -1017,12 +1049,26 @@ class StarEmissary:
     
     def _capture_output(self) -> str:
         """
-        捕获当前输出（双引擎策略）
+        捕获当前输出（三引擎策略）
         
         策略：
+        0. ⚡ CDP DOM 读取（毫秒级）- 通过 DevTools Protocol 直接读取 DOM
         1. ⚡ 日志读取（毫秒级）- 直接读取日志文件
         2. 📷 OCR 识别（秒级）- 截图 + OCR 兜底
         """
+        # 策略 0: CDP DOM 读取（最快）
+        if self._trae_cdp is not None and self._trae_cdp.is_alive():
+            try:
+                text = self._trae_cdp.get_latest_response()
+                if text:
+                    logger.debug(f"[星使] CDP 读取捕获到响应 ({len(text)} chars)")
+                    if self._current_turn:
+                        self._current_turn.response = text
+                        self._current_turn.response_source = "cdp"
+                    return text
+            except Exception as e:
+                logger.debug(f"[星使] CDP 读取失败: {e}")
+        
         # 策略 1: 日志读取（快）
         try:
             reader = get_reader()
@@ -1174,11 +1220,33 @@ class StarEmissary:
             return []
     
     def get_current_status(self) -> dict:
-        """获取当前状态"""
+        """获取当前状态（优先使用 CDP）"""
+        # 优先: CDP 状态检测
+        if self._trae_cdp is not None and self._trae_cdp.is_alive():
+            try:
+                cdp_status = self._trae_cdp.get_status()
+                return {
+                    "status": cdp_status,
+                    "is_active": cdp_status == "generating",
+                    "via": "cdp",
+                }
+            except Exception:
+                pass
+        # 降级: OCR 状态检测
         try:
             return self.ocr.get_current_status(self.star)
         except Exception:
             return {"status": "unknown", "is_active": False}
+    
+    @property
+    def cdp_available(self) -> bool:
+        """TraeCDP 是否可用（供 API 层查询连接方式）。"""
+        return self._trae_cdp is not None and self._trae_cdp.is_alive()
+    
+    @property
+    def interaction_mode(self) -> str:
+        """当前交互模式: 'cdp' | 'gui'。"""
+        return "cdp" if self.cdp_available else "gui"
     
     def clear_history(self):
         """清空对话历史"""

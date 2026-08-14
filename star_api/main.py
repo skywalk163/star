@@ -139,7 +139,42 @@ async def lifespan(app: FastAPI):
     asyncio.create_task(_scan_stars_periodically())
     
     logger.info("✨ 星核已就绪 - Star Core Ready")
-    
+
+    # 初始化 AI 适配器注册表
+    from star_core.ai_adapter import get_adapter_registry
+    from star_core.dumate_bridge import DuMateBridge
+    from star_core.trae_work_adapter import TraeWorkAdapter
+
+    registry = get_adapter_registry()
+
+    # 注册 DuMate 适配器
+    try:
+        dumate = DuMateBridge()
+        if dumate.port:
+            dumate.connect()
+            logger.info("🔌 DuMate 适配器已注册 (port=%d, connected=%s)",
+                        dumate.port, dumate.connected)
+        else:
+            logger.info("🔌 DuMate 适配器已注册 (未找到内核端口)")
+    except Exception as e:
+        logger.warning("🔌 DuMate 适配器注册失败: %s", e)
+
+    # 注册 TraeWork 适配器
+    try:
+        trae = TraeWorkAdapter()
+        if trae.is_alive():
+            trae.connect()
+            logger.info("🔌 TraeWork 适配器已注册 (connected=%s)", trae.connected)
+        else:
+            logger.info("🔌 TraeWork 适配器已注册 (CDP 端口不可达，请以 --remote-debugging-port=9223 启动 Trae)")
+    except Exception as e:
+        logger.warning("🔌 TraeWork 适配器注册失败: %s", e)
+
+    # 列出所有已注册适配器
+    adapters = registry.list_adapters()
+    logger.info("🔌 AI 适配器列表: %s",
+                [f"{a.ai_id}({a.connected})" for a in adapters])
+
     yield
     
     # 关闭时清理
@@ -511,6 +546,7 @@ from star_api.routes.work import router as work_router
 from star_api.routes.remote import router as remote_router
 from star_api.routes.observability import router as observability_router
 from star_api.routes.locators import router as locators_router
+from star_api.routes.dumate import router as dumate_router
 
 app.include_router(stars_router, prefix="/api/stars", tags=["星体"])
 app.include_router(novas_router, prefix="/api/novas", tags=["新星"])
@@ -523,6 +559,7 @@ app.include_router(work_router)
 app.include_router(remote_router, prefix="/api/remote", tags=["远程控制"])
 app.include_router(observability_router, prefix="/api/observability", tags=["可观测性"])
 app.include_router(locators_router, prefix="/api/locators", tags=["定位器校准"])
+app.include_router(dumate_router)
 
 
 # ==================== 静态文件 & 控制面板 ====================

@@ -64,6 +64,9 @@ agents:
         - type: log
           paths:
             - "~/.trae-cn/log/**/*.log"
+    cdp:
+      port: 9223
+      type: electron
 
   - id: codearts_agent
     name: CodeArts Agent

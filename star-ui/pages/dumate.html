@@ -1,0 +1,1731 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>搭子桥 - 群星 Star</title>
+  <link rel="stylesheet" href="/ui/css/main.css">
+  <link rel="stylesheet" href="/ui/css/starmap.css">
+  <style>
+    :root {
+      --color-bg: #0a0a0f;
+      --color-bg-panel: #12121a;
+      --color-bg-card: #1a1a24;
+      --color-bg-hover: #222230;
+      --color-border: rgba(100, 200, 255, 0.12);
+      --color-border-glow: rgba(100, 200, 255, 0.3);
+      --color-primary: #64c8ff;
+      --color-primary-muted: rgba(100, 200, 255, 0.5);
+      --color-text: #e0e0e8;
+      --color-text-secondary: #8888a0;
+      --color-text-muted: #555568;
+      --color-text-gold: #ffd700;
+      --color-success: #22c55e;
+      --color-warning: #f59e0b;
+      --color-error: #ef4444;
+      --color-code: #7c3aed;
+      --color-design: #f472b6;
+      --font-display: 'Cinzel', 'Songti SC', serif;
+      --font-body: 'Inter', -apple-system, sans-serif;
+      --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+      --radius: 12px;
+      --radius-sm: 8px;
+      --radius-lg: 16px;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: var(--color-bg);
+      color: var(--color-text);
+      font-family: var(--font-body);
+      min-height: 100vh;
+    }
+
+    .layout { display: flex; min-height: 100vh; }
+
+    .sidebar {
+      width: 240px;
+      background: var(--color-bg-panel);
+      border-right: 1px solid var(--color-border);
+      padding: 24px 16px;
+      position: fixed;
+      top: 0;
+      left: 0;
+      height: 100vh;
+      overflow-y: auto;
+    }
+
+    .sidebar-logo {
+      font-family: var(--font-display);
+      font-size: 22px;
+      color: var(--color-text-gold);
+      text-align: center;
+      margin-bottom: 32px;
+      letter-spacing: 2px;
+    }
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 16px;
+      border-radius: 8px;
+      color: var(--color-text-secondary);
+      text-decoration: none;
+      font-size: 14px;
+      transition: all 0.2s;
+      margin-bottom: 4px;
+    }
+    .nav-item:hover { background: var(--color-bg-hover); color: var(--color-text); }
+    .nav-item.active { background: rgba(100, 200, 255, 0.08); color: var(--color-primary); }
+    .nav-item svg { width: 18px; height: 18px; }
+
+    .main {
+      flex: 1;
+      margin-left: 240px;
+      padding: 32px;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    .page-header { margin-bottom: 16px; flex-shrink: 0; }
+    .page-title {
+      font-family: var(--font-display);
+      font-size: 26px;
+      color: var(--color-primary);
+      margin-bottom: 4px;
+    }
+    .page-subtitle {
+      color: var(--color-text-secondary);
+      font-size: 13px;
+    }
+
+    /* ===== 内核状态栏 ===== */
+    .kernel-bar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 16px;
+      background: var(--color-bg-card);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius);
+      margin-bottom: 12px;
+      flex-shrink: 0;
+    }
+    .kernel-dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .kernel-dot.online { background: var(--color-success); box-shadow: 0 0 8px rgba(34,197,94,0.5); }
+    .kernel-dot.offline { background: var(--color-error); }
+    .kernel-dot.generating { background: var(--color-warning); animation: pulse 1s infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+    .kernel-label { font-size: 13px; color: var(--color-text); }
+    .kernel-meta { font-size: 11px; color: var(--color-text-muted); }
+    .kernel-actions { margin-left: auto; display: flex; gap: 6px; }
+
+    /* ===== 工具栏 ===== */
+    .toolbar {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+      flex-shrink: 0;
+      flex-wrap: wrap;
+    }
+
+    .search-box {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      background: var(--color-bg-card);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      padding: 0 12px;
+      gap: 8px;
+      min-width: 200px;
+    }
+    .search-box input {
+      flex: 1;
+      background: none;
+      border: none;
+      outline: none;
+      color: var(--color-text);
+      font-size: 13px;
+      padding: 10px 0;
+    }
+    .search-box input::placeholder { color: var(--color-text-muted); }
+
+    .filter-group {
+      display: flex;
+      gap: 0;
+      background: var(--color-bg-card);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      overflow: hidden;
+    }
+    .filter-btn {
+      padding: 8px 14px;
+      font-size: 12px;
+      background: none;
+      border: none;
+      border-right: 1px solid var(--color-border);
+      color: var(--color-text-muted);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .filter-btn:last-child { border-right: none; }
+    .filter-btn:hover { color: var(--color-text); }
+    .filter-btn.active {
+      background: rgba(100, 200, 255, 0.12);
+      color: var(--color-primary);
+    }
+
+    .btn-new-task {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 16px;
+      background: var(--color-primary);
+      color: #000;
+      border: none;
+      border-radius: var(--radius-sm);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-new-task:hover { background: rgba(100, 200, 255, 0.8); }
+    .btn-new-task:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* ===== 主内容区域 ===== */
+    .content-area {
+      flex: 1;
+      display: flex;
+      gap: 16px;
+      min-height: 0;
+    }
+
+    /* ===== 任务列表面板 ===== */
+    .task-panel {
+      flex: 1;
+      background: var(--color-bg-panel);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+    .task-panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--color-border);
+      background: var(--color-bg-card);
+      flex-shrink: 0;
+    }
+    .task-panel-title {
+      font-size: 14px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .task-panel-title svg { width: 16px; height: 16px; color: var(--color-primary); }
+    .task-count-badge {
+      background: rgba(100, 200, 255, 0.12);
+      color: var(--color-primary);
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 10px;
+    }
+    .task-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 6px;
+    }
+    .task-list::-webkit-scrollbar { width: 4px; }
+    .task-list::-webkit-scrollbar-track { background: transparent; }
+    .task-list::-webkit-scrollbar-thumb { background: var(--color-text-muted); border-radius: 2px; }
+
+    /* ===== 任务卡片 ===== */
+    .task-card {
+      display: flex;
+      gap: 10px;
+      padding: 10px 12px;
+      background: var(--color-bg-card);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      margin-bottom: 4px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .task-card:hover {
+      border-color: var(--color-primary-muted);
+      background: var(--color-bg-hover);
+    }
+    .task-card.selected {
+      border-color: var(--color-primary);
+      background: rgba(100, 200, 255, 0.05);
+    }
+    .task-card.active-task {
+      border-left: 3px solid var(--color-success);
+    }
+    .task-card.task-type-work { border-left-color: var(--color-primary); }
+    .task-card.task-type-code { border-left-color: var(--color-code); }
+    .task-card.task-type-design { border-left-color: var(--color-design); }
+
+    .task-avatar {
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      flex-shrink: 0;
+      font-weight: 600;
+    }
+    .task-avatar.agent_output { background: rgba(100, 200, 255, 0.15); color: var(--color-primary); }
+    .task-avatar.plan_file { background: rgba(255, 215, 0, 0.15); color: var(--color-text-gold); }
+    .task-avatar.kernel_log { background: rgba(34, 197, 94, 0.15); color: var(--color-success); }
+
+    .task-body { flex: 1; min-width: 0; }
+    .task-body-top {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 3px;
+    }
+    .task-name {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--color-text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .task-type-badge {
+      font-size: 10px;
+      padding: 1px 6px;
+      border-radius: 4px;
+      flex-shrink: 0;
+    }
+    .task-type-badge.work { background: rgba(100, 200, 255, 0.15); color: var(--color-primary); }
+    .task-type-badge.code { background: rgba(124, 58, 237, 0.15); color: var(--color-code); }
+    .task-type-badge.design { background: rgba(244, 114, 182, 0.15); color: var(--color-design); }
+    .task-status-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .task-status-dot.active { background: var(--color-success); }
+    .task-status-dot.completed { background: var(--color-text-muted); }
+    .task-status-dot.unknown { background: var(--color-warning); }
+    .task-preview {
+      font-size: 11px;
+      color: var(--color-text-muted);
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      line-height: 1.5;
+      margin-bottom: 4px;
+    }
+    .task-meta-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 11px;
+      color: var(--color-text-muted);
+    }
+    .task-source-badge {
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-size: 10px;
+    }
+    .task-source-badge.agent_output { background: rgba(100, 200, 255, 0.1); color: var(--color-primary); }
+    .task-source-badge.plan_file { background: rgba(255, 215, 0, 0.1); color: var(--color-text-gold); }
+    .task-source-badge.kernel_log { background: rgba(34, 197, 94, 0.1); color: var(--color-success); }
+    .task-actions-overlay {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      flex-shrink: 0;
+      opacity: 0;
+      transition: opacity 0.15s;
+    }
+    .task-card:hover .task-actions-overlay { opacity: 1; }
+    .task-action-btn {
+      width: 26px;
+      height: 26px;
+      border-radius: 6px;
+      border: 1px solid var(--color-border);
+      background: var(--color-bg-card);
+      color: var(--color-text-secondary);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s;
+    }
+    .task-action-btn:hover { background: var(--color-bg-hover); color: var(--color-text); }
+    .task-action-btn.danger:hover { border-color: var(--color-error); color: var(--color-error); }
+
+    /* ===== 详情面板 ===== */
+    .detail-panel {
+      width: 420px;
+      background: var(--color-bg-panel);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+      transition: width 0.3s, opacity 0.3s;
+    }
+    .detail-panel.empty {
+      width: 0;
+      opacity: 0;
+      overflow: hidden;
+      border: none;
+    }
+    .detail-header {
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--color-border);
+      background: var(--color-bg-card);
+      flex-shrink: 0;
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .detail-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--color-text);
+      word-break: break-all;
+    }
+    .detail-close {
+      width: 26px;
+      height: 26px;
+      border-radius: 6px;
+      border: 1px solid var(--color-border);
+      background: var(--color-bg-card);
+      color: var(--color-text-muted);
+      cursor: pointer;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .detail-close:hover { color: var(--color-text); background: var(--color-bg-hover); }
+    .detail-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 14px 16px;
+    }
+    .detail-body::-webkit-scrollbar { width: 4px; }
+    .detail-body::-webkit-scrollbar-track { background: transparent; }
+    .detail-body::-webkit-scrollbar-thumb { background: var(--color-text-muted); border-radius: 2px; }
+
+    .detail-info-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .detail-info-item {
+      background: var(--color-bg-card);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      padding: 8px 10px;
+    }
+    .detail-info-label {
+      font-size: 10px;
+      color: var(--color-text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 3px;
+    }
+    .detail-info-value {
+      font-size: 12px;
+      color: var(--color-text);
+    }
+    .detail-content {
+      background: var(--color-bg-card);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      padding: 10px;
+      margin-bottom: 10px;
+    }
+    .detail-content pre {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--color-text-secondary);
+      white-space: pre-wrap;
+      word-break: break-all;
+      line-height: 1.6;
+      max-height: 300px;
+      overflow-y: auto;
+    }
+    .detail-actions {
+      display: flex;
+      gap: 6px;
+      margin-top: 10px;
+    }
+    .detail-actions button {
+      flex: 1;
+      padding: 8px;
+      border-radius: var(--radius-sm);
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      border: 1px solid var(--color-border);
+      transition: all 0.15s;
+    }
+    .btn-copy { background: var(--color-bg-hover); color: var(--color-text); }
+    .btn-copy:hover { background: var(--color-bg-card); }
+    .btn-stop { background: rgba(239, 68, 68, 0.12); color: var(--color-error); border-color: rgba(239, 68, 68, 0.3); }
+    .btn-stop:hover { background: rgba(239, 68, 68, 0.2); }
+    .btn-view-log { background: var(--color-bg-hover); color: var(--color-primary); }
+    .btn-view-log:hover { background: var(--color-bg-card); }
+
+    /* ===== 实时输出区域 ===== */
+    .stream-output {
+      background: #0d0d14;
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      padding: 10px;
+      margin-bottom: 10px;
+      max-height: 250px;
+      overflow-y: auto;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      line-height: 1.6;
+    }
+    .stream-output::-webkit-scrollbar { width: 4px; }
+    .stream-output::-webkit-scrollbar-track { background: transparent; }
+    .stream-output::-webkit-scrollbar-thumb { background: var(--color-text-muted); border-radius: 2px; }
+
+    .stream-line {
+      color: var(--color-text-secondary);
+      padding: 1px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.03);
+    }
+    .stream-line.engine-send { color: var(--color-primary); }
+    .stream-line.session-status { color: var(--color-text-gold); }
+    .stream-line.error { color: var(--color-error); }
+    .stream-line.user-message { color: var(--color-success); }
+
+    /* ===== 新建任务弹窗 ===== */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0, 0, 0, 0.6);
+      backdrop-filter: blur(4px);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-overlay.visible { display: flex; }
+    .modal {
+      width: 560px;
+      max-width: 90vw;
+      background: var(--color-bg-panel);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+    }
+    .modal-header {
+      padding: 18px 22px 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .modal-title { font-size: 17px; font-weight: 600; color: var(--color-text); }
+    .modal-close {
+      width: 30px; height: 30px;
+      border-radius: 8px;
+      border: 1px solid var(--color-border);
+      background: var(--color-bg-hover);
+      color: var(--color-text-muted);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-close:hover { color: var(--color-text); }
+    .modal-body { padding: 18px 22px; }
+
+    .form-group {
+      margin-bottom: 14px;
+    }
+    .form-label {
+      display: block;
+      font-size: 12px;
+      color: var(--color-text-secondary);
+      margin-bottom: 6px;
+      font-weight: 500;
+    }
+    .form-textarea {
+      width: 100%;
+      background: var(--color-bg-card);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      padding: 12px;
+      color: var(--color-text);
+      font-size: 13px;
+      font-family: var(--font-body);
+      resize: vertical;
+      min-height: 100px;
+    }
+    .form-textarea:focus {
+      outline: none;
+      border-color: var(--color-primary);
+    }
+    .form-textarea::placeholder { color: var(--color-text-muted); }
+
+    .form-row {
+      display: flex;
+      gap: 12px;
+    }
+    .form-row .form-group { flex: 1; }
+
+    .form-select {
+      width: 100%;
+      background: var(--color-bg-card);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      padding: 10px 12px;
+      color: var(--color-text);
+      font-size: 13px;
+      cursor: pointer;
+    }
+    .form-select:focus {
+      outline: none;
+      border-color: var(--color-primary);
+    }
+
+    /* 任务类型选择卡片 */
+    .type-selector {
+      display: flex;
+      gap: 8px;
+    }
+    .type-card {
+      flex: 1;
+      padding: 10px;
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      background: var(--color-bg-card);
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.2s;
+    }
+    .type-card:hover {
+      border-color: var(--color-primary-muted);
+    }
+    .type-card.selected {
+      border-color: var(--color-primary);
+      background: rgba(100, 200, 255, 0.08);
+    }
+    .type-card.selected.work { border-color: var(--color-primary); }
+    .type-card.selected.code { border-color: var(--color-code); }
+    .type-card.selected.design { border-color: var(--color-design); }
+    .type-card-icon {
+      font-size: 20px;
+      margin-bottom: 4px;
+    }
+    .type-card-name {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--color-text);
+    }
+    .type-card-desc {
+      font-size: 10px;
+      color: var(--color-text-muted);
+      margin-top: 2px;
+    }
+
+    .modal-result {
+      margin: 0 22px 14px;
+      padding: 10px 14px;
+      border-radius: var(--radius-sm);
+      font-size: 13px;
+      display: none;
+    }
+    .modal-result.success { display: block; background: rgba(34, 197, 94, 0.1); color: var(--color-success); }
+    .modal-result.error { display: block; background: rgba(239, 68, 68, 0.1); color: var(--color-error); }
+
+    .modal-footer {
+      padding: 0 22px 18px;
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+    }
+    .btn-cancel {
+      padding: 10px 20px;
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      background: none;
+      color: var(--color-text-muted);
+      cursor: pointer;
+      font-size: 13px;
+    }
+    .btn-cancel:hover { color: var(--color-text); background: var(--color-bg-hover); }
+    .btn-primary {
+      padding: 10px 20px;
+      border: none;
+      border-radius: var(--radius-sm);
+      background: var(--color-primary);
+      color: #000;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .btn-primary:hover { opacity: 0.9; }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* ===== 空状态 ===== */
+    .empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 60px 20px;
+      color: var(--color-text-muted);
+    }
+    .empty-state svg { width: 48px; height: 48px; margin-bottom: 12px; opacity: 0.3; }
+    .empty-state p { font-size: 13px; }
+
+    /* ===== 通知栏 ===== */
+    .list-status {
+      font-size: 11px;
+      color: var(--color-text-muted);
+      transition: color 0.3s;
+    }
+
+    /* ===== AI 适配器栏（Trae / DuMate 统一连接入口） ===== */
+    .adapter-bar {
+      display: flex;
+      align-items: stretch;
+      gap: 10px;
+      margin-bottom: 12px;
+      flex-shrink: 0;
+      flex-wrap: wrap;
+    }
+    .adapter-bar-title {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: var(--color-text-secondary);
+      padding-right: 4px;
+    }
+    .adapter-card {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 12px;
+      background: var(--color-bg-card);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      min-width: 220px;
+    }
+    .adapter-card.connected { border-color: rgba(34, 197, 94, 0.4); }
+    .adapter-card.offline { border-color: rgba(239, 68, 68, 0.3); }
+    .adapter-info { flex: 1; min-width: 0; }
+    .adapter-name { font-size: 13px; color: var(--color-text); font-weight: 600; }
+    .adapter-status-text { font-size: 11px; color: var(--color-text-muted); }
+    .adapter-status-text.hint { color: var(--color-warning); }
+    .adapter-btn {
+      padding: 6px 12px;
+      border-radius: 6px;
+      border: 1px solid var(--color-border);
+      background: var(--color-bg-hover);
+      color: var(--color-text);
+      font-size: 12px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .adapter-btn.connect { color: var(--color-success); border-color: rgba(34, 197, 94, 0.3); }
+    .adapter-btn.connect:hover { background: rgba(34, 197, 94, 0.12); }
+    .adapter-btn.disconnect { color: var(--color-error); border-color: rgba(239, 68, 68, 0.3); }
+    .adapter-btn.disconnect:hover { background: rgba(239, 68, 68, 0.12); }
+    .adapter-btn.restart { color: var(--color-warning, #d97706); border-color: rgba(217, 119, 6, 0.35); }
+    .adapter-btn.restart:hover { background: rgba(217, 119, 6, 0.12); }
+    .adapter-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* 新建任务弹窗中的目标适配器选择 */
+    .adapter-select-row { margin-bottom: 14px; }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <!-- 侧边导航 -->
+    <nav class="sidebar">
+      <div class="sidebar-logo">群星 Star</div>
+      <a href="/ui/pages/starmap.html" class="nav-item" data-dom-id="nav-starmap">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l2 7h7l-5.5 4 2 7L12 16l-5.5 4 2-7L3 9h7z"/></svg>星图
+      </a>
+      <a href="/ui/pages/starlight.html" class="nav-item" data-dom-id="nav-starlight">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>星光
+      </a>
+      <a href="/ui/pages/dispatch.html" class="nav-item" data-dom-id="nav-dispatch">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"/><circle cx="8" cy="6" r="1.5"/><circle cx="8" cy="12" r="1.5"/><circle cx="8" cy="18" r="1.5"/></svg>调度
+      </a>
+      <a href="/ui/pages/dumate.html" class="nav-item active" data-dom-id="nav-dumate">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>搭子桥
+      </a>
+      <a href="/ui/pages/settings.html" class="nav-item" data-dom-id="nav-settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>设置
+      </a>
+    </nav>
+
+    <!-- 主内容 -->
+    <div class="main">
+      <div class="page-header">
+        <div class="page-title">搭子桥</div>
+        <div class="page-subtitle">DuMate · PC 端 AI 任务实时操控与管理</div>
+      </div>
+
+      <!-- 内核状态栏 -->
+      <div class="kernel-bar" id="kernelBar">
+        <span class="kernel-dot offline" id="kernelDot"></span>
+        <div>
+          <div class="kernel-label" id="kernelLabel">检测中...</div>
+          <div class="kernel-meta" id="kernelMeta">端口: -</div>
+        </div>
+        <div class="kernel-actions">
+          <button class="filter-btn" onclick="showKernelLog()" style="border:1px solid var(--color-border);border-radius:6px;padding:6px 10px;background:var(--color-bg-card)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+          </button>
+          <button class="filter-btn" onclick="refreshAll()" style="border:1px solid var(--color-border);border-radius:6px;padding:6px 10px;background:var(--color-bg-card)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M1 4v6h6M23 20v-6h-6"/><path d="M20.49 9A9 9 0 005.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 013.51 15"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- AI 适配器栏（统一连接入口：DuMate / Trae Work） -->
+      <div class="adapter-bar" id="adapterBar">
+        <div class="adapter-bar-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+          AI 适配器
+        </div>
+        <div id="adapterList" style="display:flex;gap:10px;flex-wrap:wrap;flex:1">
+          <span class="adapter-status-text">加载中...</span>
+        </div>
+        <button class="filter-btn" onclick="loadAdapters()" style="border:1px solid var(--color-border);border-radius:6px;padding:6px 10px;background:var(--color-bg-card)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M1 4v6h6M23 20v-6h-6"/><path d="M20.49 9A9 9 0 005.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 013.51 15"/></svg>
+        </button>
+      </div>
+
+      <!-- 工具栏 -->
+      <div class="toolbar">
+        <div class="search-box">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" style="color:var(--color-text-muted);flex-shrink:0"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input type="text" id="searchInput" placeholder="搜索任务名称、ID..." oninput="onSearch()">
+        </div>
+        <div class="filter-group">
+          <button class="filter-btn active" data-filter="all" onclick="setFilter('all')">全部</button>
+          <button class="filter-btn" data-filter="active" onclick="setFilter('active')">活跃</button>
+          <button class="filter-btn" data-filter="completed" onclick="setFilter('completed')">已完成</button>
+          <button class="filter-btn" data-filter="work" onclick="setFilter('work')">工作</button>
+          <button class="filter-btn" data-filter="code" onclick="setFilter('code')">代码</button>
+          <button class="filter-btn" data-filter="design" onclick="setFilter('design')">设计</button>
+        </div>
+        <button class="btn-new-task" onclick="showNewTaskModal()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          新建任务
+        </button>
+      </div>
+
+      <!-- 主内容区域 -->
+      <div class="content-area">
+        <!-- 任务列表 -->
+        <div class="task-panel">
+          <div class="task-panel-header">
+            <div class="task-panel-title">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+              任务列表
+              <span class="task-count-badge" id="taskCount">0</span>
+            </div>
+            <span class="list-status" id="listStatus">自动刷新中</span>
+          </div>
+          <div class="task-list" id="taskList">
+            <div class="empty-state">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+              <p>正在加载任务列表...</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- 详情面板 -->
+        <div class="detail-panel empty" id="detailPanel">
+          <div class="detail-header">
+            <div style="flex:1;min-width:0">
+              <div class="detail-title" id="detailTitle">选择任务查看详情</div>
+            </div>
+            <button class="detail-close" onclick="closeDetail()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </div>
+          <div class="detail-body" id="detailBody">
+            <div class="empty-state" style="padding:40px 0">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+              <p>点击左侧任务卡片查看详情</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 新建任务弹窗 -->
+  <div class="modal-overlay" id="newTaskModal">
+    <div class="modal">
+      <div class="modal-header">
+        <div class="modal-title">新建 DuMate 任务</div>
+        <button class="modal-close" onclick="hideNewTaskModal()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <!-- 目标适配器选择 -->
+        <div class="form-group adapter-select-row">
+          <div class="form-label">目标 AI 适配器</div>
+          <select class="form-select" id="adapterSelect" onchange="updateAdapterHint()">
+            <option value="dumate">DuMate (Comate)</option>
+          </select>
+          <div class="adapter-status-text" id="adapterSelectHint" style="margin-top:4px"></div>
+        </div>
+
+        <!-- 任务类型选择 -->
+        <div class="form-group">
+          <div class="form-label">任务类型</div>
+          <div class="type-selector" id="taskTypeSelector">
+            <div class="type-card selected work" data-type="work" onclick="selectTaskType('work')">
+              <div class="type-card-icon">⚙</div>
+              <div class="type-card-name">工作模式</div>
+              <div class="type-card-desc">通用任务 · 读写文件</div>
+            </div>
+            <div class="type-card code" data-type="code" onclick="selectTaskType('code')">
+              <div class="type-card-icon">💻</div>
+              <div class="type-card-name">代码模式</div>
+              <div class="type-card-desc">代码生成 · 重构</div>
+            </div>
+            <div class="type-card design" data-type="design" onclick="selectTaskType('design')">
+              <div class="type-card-icon">🎨</div>
+              <div class="type-card-name">设计模式</div>
+              <div class="type-card-desc">架构设计 · 文档</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 工作目录选择 -->
+        <div class="form-row">
+          <div class="form-group">
+            <div class="form-label">工作目录</div>
+            <select class="form-select" id="workspaceSelect">
+              <option value="">默认工作目录</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <div class="form-label">Agent</div>
+            <select class="form-select" id="agentSelect">
+              <option value="Comate">Comate (默认)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- 提示词输入 -->
+        <div class="form-group">
+          <div class="form-label">任务描述</div>
+          <textarea class="form-textarea" id="promptInput" placeholder="输入任务描述，例如：&#10;请分析这个项目的代码结构&#10;帮我把这个模块重构一下&#10;写一个单元测试用例..."></textarea>
+        </div>
+      </div>
+      <div class="modal-result" id="createResult"></div>
+      <div class="modal-footer">
+        <button class="btn-cancel" onclick="hideNewTaskModal()">取消</button>
+        <button class="btn-primary" onclick="createTask()" id="sendBtn">发送任务</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/ui/js/api-bridge.js"></script>
+  <script>
+    // ===== 状态 =====
+    let allTasks = [];
+    let currentFilter = 'all';
+    let searchQuery = '';
+    let selectedTaskId = null;
+    let refreshTimer = null;
+    let selectedType = 'work';
+    let eventSource = null;
+    let sessionEventSource = null;
+    let contentPollTimer = null;      // 活跃任务内容轮询定时器
+    let lastContentLength = 0;        // 上次轮询到的内容长度
+
+    // ===== 初始化 =====
+    document.addEventListener('DOMContentLoaded', () => {
+      refreshAll();
+      refreshTimer = setInterval(refreshAll, 10000);
+      // 加载工作目录列表
+      loadWorkspaces();
+      // 加载并渲染 AI 适配器（DuMate / Trae Work 连接入口）
+      loadAdapters();
+      // 连接 SSE 事件流
+      connectEventStream();
+    });
+
+    // ===== SSE 事件流 =====
+    function connectEventStream() {
+      if (eventSource) {
+        eventSource.close();
+      }
+      eventSource = new EventSource(dumateApi.streamUrl());
+      eventSource.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          handleKernelEvent(data);
+        } catch (e) {}
+      };
+      eventSource.onerror = () => {
+        // 断线重连
+        setTimeout(connectEventStream, 3000);
+      };
+    }
+
+    function handleKernelEvent(event) {
+      // 更新状态栏
+      if (event.type === 'session_status_changed') {
+        const payload = event.data;
+        if (payload && payload.type === 'SESSION_STATUS_UPDATED') {
+          const session = payload.payload;
+          const status = session.status;
+          const title = session.title || '';
+
+          // 更新状态指示器
+          const dot = document.getElementById('kernelDot');
+          if (status === 'running') {
+            dot.className = 'kernel-dot generating';
+          } else if (status === 'completed') {
+            dot.className = 'kernel-dot online';
+          }
+
+          // 如果有选中的任务且有流式监听，更新详情面板
+          if (sessionEventSource && session.sessionUuid) {
+            updateStreamOutput(session);
+          }
+
+          // 自动刷新任务列表
+          refreshTasks();
+        }
+      }
+    }
+
+    // ===== 刷新全部 =====
+    async function refreshAll() {
+      await Promise.all([refreshStatus(), refreshTasks(), loadAdapters()]);
+    }
+
+    // ===== 内核状态 =====
+    async function refreshStatus() {
+      try {
+        const info = await dumateApi.discover();
+        const dot = document.getElementById('kernelDot');
+        const label = document.getElementById('kernelLabel');
+        const meta = document.getElementById('kernelMeta');
+
+        if (info.kernel_online) {
+          dot.className = 'kernel-dot online';
+          label.textContent = '内核在线 · DuMate 已就绪';
+          meta.textContent = '端口: ' + (info.port || '-') + ' · ' + info.agent_output_count + ' Agent 输出 · ' + info.plan_count + ' 计划文件';
+        } else if (info.found) {
+          dot.className = 'kernel-dot offline';
+          label.textContent = '内核离线 · 发现 DuMate 配置';
+          meta.textContent = '端口: ' + (info.port || '-') + ' · 请启动 Comate';
+        } else {
+          dot.className = 'kernel-dot offline';
+          label.textContent = '未检测到 DuMate';
+          meta.textContent = '请确保已安装 Comate';
+        }
+      } catch (e) {
+        document.getElementById('kernelDot').className = 'kernel-dot offline';
+        document.getElementById('kernelLabel').textContent = '检测失败';
+        document.getElementById('kernelMeta').textContent = e.message;
+      }
+    }
+
+    // ===== AI 适配器管理（统一连接入口，含 Trae Work） =====
+    // 显式挂到 window，便于测试/控制台探查
+    window.adaptersCache = [];
+
+    async function loadAdapters() {
+      try {
+        const res = await adapterApi.list();
+        window.adaptersCache = res.adapters || [];
+      } catch (e) {
+        window.adaptersCache = [];
+      }
+      renderAdapters();
+      refreshAdapterSelect();
+    }
+
+    function renderAdapters() {
+      const listEl = document.getElementById('adapterList');
+      if (!window.adaptersCache.length) {
+        listEl.innerHTML = `<span class="adapter-status-text">未发现适配器</span>`;
+        return;
+      }
+      listEl.innerHTML = window.adaptersCache.map(a => {
+        const connected = !!a.connected;
+        const alive = !!a.alive;
+        let statusText = '离线';
+        if (connected) statusText = a.status || '已连接';
+        else if (alive) statusText = '可达 · 未连接';
+        const isTrae = a.ai_id === 'trae_work';
+        const hint = (!connected && isTrae)
+          ? ' 点"检测并重启 Trae"：Star 会关闭现有 Trae 并以调试端口重启'
+          : '';
+        return `
+          <div class="adapter-card ${connected ? 'connected' : 'offline'}">
+            <span class="kernel-dot ${connected ? 'online' : 'offline'}"></span>
+            <div class="adapter-info">
+              <div class="adapter-name">${escapeHtml(a.ai_name || a.ai_id)}</div>
+              <div class="adapter-status-text ${(!connected && isTrae) ? 'hint' : ''}">${escapeHtml(statusText)}${escapeHtml(hint)}</div>
+            </div>
+            ${connected
+              ? `<button class="adapter-btn disconnect" onclick="disconnectAdapter('${a.ai_id}')">断开</button>`
+              : (isTrae
+                  ? `<button class="adapter-btn connect" onclick="connectAdapter('${a.ai_id}')">连接</button>
+                     <button class="adapter-btn restart" onclick="restartAdapter('${a.ai_id}')">检测并重启 Trae</button>`
+                  : `<button class="adapter-btn connect" onclick="connectAdapter('${a.ai_id}')">连接</button>`)}
+          </div>`;
+      }).join('');
+    }
+
+    async function connectAdapter(aiId) {
+      showNotification('正在连接 ' + aiId + (aiId === 'trae_work' ? '（必要时自动启动 Trae）' : '') + '…', 'info');
+      try {
+        const res = await adapterApi.connect(aiId);
+        if (res.success) {
+          showNotification('✓ ' + res.message, 'success');
+        } else {
+          showNotification('✗ ' + (res.message || '连接失败'), 'error');
+        }
+      } catch (e) {
+        showNotification('连接失败: ' + e.message, 'error');
+      }
+      await loadAdapters();
+    }
+
+    async function disconnectAdapter(aiId) {
+      try {
+        await adapterApi.disconnect(aiId);
+      } catch (e) {}
+      await loadAdapters();
+    }
+
+    async function restartAdapter(aiId) {
+      showNotification('正在关闭已运行的 Trae 并以调试端口重启…', 'info');
+      try {
+        const res = await adapterApi.restart(aiId);
+        if (res.success) {
+          showNotification('✓ ' + res.message, 'success');
+        } else {
+          showNotification('✗ ' + (res.message || '重启失败'), 'error');
+        }
+      } catch (e) {
+        showNotification('重启失败: ' + e.message, 'error');
+      }
+      await loadAdapters();
+    }
+
+    function refreshAdapterSelect() {
+      const sel = document.getElementById('adapterSelect');
+      if (!sel) return;
+      const prev = sel.value;
+      sel.innerHTML = window.adaptersCache.map(a =>
+        `<option value="${a.ai_id}">${escapeHtml(a.ai_name || a.ai_id)}${a.connected ? ' (已连接)' : ' (离线)'}</option>`
+      ).join('');
+      // 保活已选或退回 dumate
+      sel.value = (window.adaptersCache.find(a => a.ai_id === prev)) ? prev : 'dumate';
+      updateAdapterHint();
+    }
+
+    function updateAdapterHint() {
+      const sel = document.getElementById('adapterSelect');
+      const hint = document.getElementById('adapterSelectHint');
+      if (!sel || !hint) return;
+      const a = window.adaptersCache.find(x => x.ai_id === sel.value);
+      if (!a) { hint.textContent = ''; return; }
+      if (a.connected) {
+        hint.textContent = a.ai_id === 'trae_work' ? '消息将发送到 Trae 窗口' : '已连接，可派发任务';
+        hint.className = 'adapter-status-text';
+      } else {
+        hint.textContent = a.ai_id === 'trae_work'
+          ? 'Trae 未连接：点上方"检测并重启 Trae"，Star 会关闭现有 Trae 并以调试端口重启'
+          : '未连接，发送将失败';
+        hint.className = 'adapter-status-text hint';
+      }
+    }
+
+    // ===== 工作目录加载 =====
+    async function loadWorkspaces() {
+      try {
+        const res = await dumateApi.listWorkspaces();
+        const select = document.getElementById('workspaceSelect');
+        const workspaces = res.workspaces || [];
+        // 保留默认选项
+        while (select.options.length > 1) {
+          select.remove(1);
+        }
+        workspaces.forEach(ws => {
+          const opt = document.createElement('option');
+          opt.value = ws.path;
+          opt.textContent = ws.name + ' (' + ws.path + ')';
+          select.appendChild(opt);
+        });
+      } catch (e) {}
+    }
+
+    // ===== 任务列表 =====
+    async function refreshTasks() {
+      try {
+        allTasks = await dumateApi.listTasks();
+        document.getElementById('taskCount').textContent = allTasks.length;
+        renderTasks();
+      } catch (e) {
+        document.getElementById('taskList').innerHTML = `
+          <div class="empty-state">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M15 9l-6 6M9 9l6 6"/></svg>
+            <p>加载失败: ${e.message}</p>
+          </div>`;
+      }
+    }
+
+    // ===== 任务渲染 =====
+    function renderTasks() {
+      let filtered = allTasks;
+
+      // 搜索过滤
+      if (searchQuery) {
+        const q = searchQuery.toLowerCase();
+        filtered = filtered.filter(t =>
+          t.name.toLowerCase().includes(q) ||
+          t.task_id.toLowerCase().includes(q) ||
+          (t.content_preview && t.content_preview.toLowerCase().includes(q))
+        );
+      }
+
+      // 状态/来源过滤
+      switch (currentFilter) {
+        case 'active':
+          filtered = filtered.filter(t => t.status === 'active');
+          break;
+        case 'completed':
+          filtered = filtered.filter(t => t.status === 'completed');
+          break;
+        case 'work':
+        case 'code':
+        case 'design':
+          // 任务类型过滤 - 从内容中匹配类型关键词
+          filtered = filtered.filter(t => {
+            const content = (t.content_preview || '') + (t.name || '');
+            const typeWords = { work: ['work', '工作', '任务', 'todo'], code: ['code', '代码', '函数', 'class'], design: ['design', '设计', '架构', '方案'] };
+            const words = typeWords[currentFilter] || [];
+            return words.some(w => content.toLowerCase().includes(w));
+          });
+          break;
+      }
+
+      if (filtered.length === 0) {
+        document.getElementById('taskList').innerHTML = `
+          <div class="empty-state">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+            <p>${searchQuery ? '没有匹配的任务' : '暂无任务'}</p>
+          </div>`;
+        return;
+      }
+
+      const html = filtered.map(t => {
+        const avatarClass = t.source === 'agent_output' ? 'agent_output' : t.source === 'plan_file' ? 'plan_file' : 'kernel_log';
+        let avatarLetter = 'A';
+        if (t.source === 'plan_file') avatarLetter = 'P';
+        else if (t.source === 'kernel_log') avatarLetter = 'K';
+
+        const timeStr = t.updated_at ? formatTime(t.updated_at) : '';
+        const isActive = t.status === 'active';
+        const isSelected = t.task_id === selectedTaskId;
+
+        let preview = t.content_preview || '（无内容）';
+        if (preview.length > 100) preview = preview.substring(0, 100) + '...';
+
+        // 推断任务类型（从内容中匹配）
+        let taskType = 'work';
+        const content = (t.content_preview || '') + (t.name || '');
+        if (content.includes('code') || content.includes('代码') || content.includes('function') || content.includes('class')) {
+          taskType = 'code';
+        } else if (content.includes('design') || content.includes('设计') || content.includes('架构') || content.includes('方案')) {
+          taskType = 'design';
+        }
+
+        const typeNames = { work: '工作', code: '代码', design: '设计' };
+
+        return `
+          <div class="task-card task-type-${taskType} ${isActive ? 'active-task' : ''} ${isSelected ? 'selected' : ''}"
+               onclick="selectTask('${t.task_id}')">
+            <div class="task-avatar ${avatarClass}">${avatarLetter}</div>
+            <div class="task-body">
+              <div class="task-body-top">
+                <span class="task-name">${escapeHtml(t.name)}</span>
+                <span class="task-type-badge ${taskType}">${typeNames[taskType]}</span>
+                <span class="task-status-dot ${t.status}"></span>
+              </div>
+              <div class="task-preview">${escapeHtml(preview)}</div>
+              <div class="task-meta-row">
+                <span class="task-source-badge ${t.source}">${t.source}</span>
+                <span class="task-agent">${t.agent_name}</span>
+                <span class="task-time">${timeStr}</span>
+              </div>
+            </div>
+            <div class="task-actions-overlay">
+              <button class="task-action-btn" onclick="event.stopPropagation();selectTask('${t.task_id}')" title="查看详情">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              </button>
+              ${isActive ? `<button class="task-action-btn danger" onclick="event.stopPropagation();stopTask('${t.task_id}')" title="结束任务">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+              </button>` : ''}
+            </div>
+          </div>`;
+      }).join('');
+
+      document.getElementById('taskList').innerHTML = html;
+    }
+
+    // ===== 搜索/筛选 =====
+    function onSearch() {
+      searchQuery = document.getElementById('searchInput').value.trim();
+      renderTasks();
+    }
+    function setFilter(filter) {
+      currentFilter = filter;
+      document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+      document.querySelector(`.filter-btn[data-filter="${filter}"]`).classList.add('active');
+      renderTasks();
+    }
+
+    // ===== 选择任务 =====
+    async function selectTask(taskId) {
+      selectedTaskId = taskId;
+      renderTasks();
+
+      const panel = document.getElementById('detailPanel');
+      panel.classList.remove('empty');
+
+      const body = document.getElementById('detailBody');
+      body.innerHTML = `
+        <div class="empty-state" style="padding:30px 0">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+          <p>加载中...</p>
+        </div>`;
+
+      try {
+        const task = await dumateApi.getTask(taskId);
+        document.getElementById('detailTitle').textContent = task.name;
+
+        const timeStr = task.updated_at ? formatTime(task.updated_at) : '-';
+        const createdStr = task.created_at ? formatTime(task.created_at) : '-';
+        const isActive = task.status === 'active';
+
+        body.innerHTML = `
+          <div class="detail-info-grid">
+            <div class="detail-info-item">
+              <div class="detail-info-label">任务 ID</div>
+              <div class="detail-info-value" style="font-family:var(--font-mono);font-size:11px">${task.task_id}</div>
+            </div>
+            <div class="detail-info-item">
+              <div class="detail-info-label">状态</div>
+              <div class="detail-info-value">
+                <span class="task-status-dot ${task.status}" style="display:inline-block;vertical-align:middle;margin-right:6px"></span>
+                ${task.status === 'active' ? '进行中' : task.status === 'completed' ? '已完成' : '未知'}
+              </div>
+            </div>
+            <div class="detail-info-item">
+              <div class="detail-info-label">来源</div>
+              <div class="detail-info-value">
+                <span class="task-source-badge ${task.source}">${task.source}</span>
+              </div>
+            </div>
+            <div class="detail-info-item">
+              <div class="detail-info-label">Agent</div>
+              <div class="detail-info-value">${task.agent_name}</div>
+            </div>
+            <div class="detail-info-item">
+              <div class="detail-info-label">创建时间</div>
+              <div class="detail-info-value" style="font-size:11px">${createdStr}</div>
+            </div>
+            <div class="detail-info-item">
+              <div class="detail-info-label">更新时间</div>
+              <div class="detail-info-value" style="font-size:11px">${timeStr}</div>
+            </div>
+          </div>
+          ${isActive ? '<div class="stream-output" id="streamOutput"><div class="stream-line">等待内核响应...</div></div>' : ''}
+          <div class="detail-content">
+            <div style="margin-bottom:6px;font-size:11px;color:var(--color-text-muted);display:flex;justify-content:space-between">
+              <span>任务内容</span>
+              <span>${task.content_length} 字符</span>
+            </div>
+            <pre>${escapeHtml(task.content_preview || '（无内容）')}</pre>
+          </div>
+          <div class="detail-actions">
+            <button class="btn-copy" onclick="copyTaskContent('${task.task_id}')">📋 复制内容</button>
+            ${isActive ? `<button class="btn-stop" onclick="stopTask('${task.task_id}')">⏹ 结束任务</button>` : ''}
+            <button class="btn-view-log" onclick="viewTaskLog('${task.task_id}')">📄 查看日志</button>
+          </div>`;
+
+        // 如果是活跃任务，启动 SSE 会话监听和内容轮询
+        if (isActive) {
+          connectSessionStream(taskId);
+          // 使用数字 task_id 启动内容轮询（后端已支持）
+          startContentPolling(taskId);
+        }
+      } catch (e) {
+        body.innerHTML = `
+          <div class="empty-state">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M15 9l-6 6M9 9l6 6"/></svg>
+            <p>加载失败: ${e.message}</p>
+          </div>`;
+      }
+    }
+
+    function closeDetail() {
+      selectedTaskId = null;
+      document.getElementById('detailPanel').classList.add('empty');
+      if (sessionEventSource) {
+        sessionEventSource.close();
+        sessionEventSource = null;
+      }
+      stopContentPolling();
+      renderTasks();
+    }
+
+    // ===== SSE 会话流式监听 =====
+    function connectSessionStream(conversationId) {
+      if (sessionEventSource) {
+        sessionEventSource.close();
+      }
+      sessionEventSource = new EventSource(dumateApi.streamSessionUrl(conversationId));
+      sessionEventSource.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.type === 'session_status') {
+            updateStreamOutput(data.data);
+          } else if (data.type === 'stream_end') {
+            if (sessionEventSource) {
+              sessionEventSource.close();
+              sessionEventSource = null;
+            }
+            // 任务完成，刷新列表
+            refreshTasks();
+          }
+        } catch (e) {}
+      };
+      sessionEventSource.onerror = () => {
+        if (sessionEventSource) {
+          sessionEventSource.close();
+          sessionEventSource = null;
+        }
+      };
+    }
+
+    function updateStreamOutput(session) {
+      const streamEl = document.getElementById('streamOutput');
+      if (!streamEl) return;
+
+      const status = session.status || 'unknown';
+      const statusNames = { running: '⏳ 生成中...', completed: '✅ 已完成', failed: '❌ 失败', error: '❌ 错误' };
+      const statusName = statusNames[status] || status;
+
+      // 添加状态行
+      const line = document.createElement('div');
+      line.className = 'stream-line session-status';
+      line.textContent = `[${formatTime(new Date().toISOString())}] 会话状态: ${statusName}`;
+      streamEl.appendChild(line);
+      streamEl.scrollTop = streamEl.scrollHeight;
+
+      // 如果任务变为运行中，启动内容轮询
+      if (status === 'running') {
+        startContentPolling(session.sessionUuid);
+      }
+
+      // 如果完成，停止轮询并重新加载任务
+      if (status === 'completed' || status === 'failed' || status === 'error') {
+        stopContentPolling();
+        setTimeout(() => {
+          refreshTasks();
+          if (selectedTaskId) {
+            selectTask(selectedTaskId);
+          }
+        }, 2000);
+      }
+    }
+
+    // ===== 活跃任务内容轮询 =====
+    function startContentPolling(conversationId) {
+      stopContentPolling();
+      lastContentLength = 0;
+
+      contentPollTimer = setInterval(async () => {
+        try {
+          const res = await dumateApi.getConversationOutput(conversationId, 500);
+          if (res.found && res.content) {
+            const streamEl = document.getElementById('streamOutput');
+            if (!streamEl) return;
+
+            // 检查内容是否有更新
+            if (res.content.length > lastContentLength) {
+              const newText = res.content.substring(lastContentLength);
+              lastContentLength = res.content.length;
+
+              // 将新内容逐行添加到流输出
+              const lines = newText.split('\n').filter(l => l.trim());
+              lines.forEach(text => {
+                const line = document.createElement('div');
+                line.className = 'stream-line';
+                line.textContent = text;
+                streamEl.appendChild(line);
+              });
+              streamEl.scrollTop = streamEl.scrollHeight;
+
+              // 同步更新详情面板中的内容预览
+              const contentPre = document.querySelector('#detailBody pre');
+              if (contentPre) {
+                contentPre.textContent = res.content;
+              }
+
+              // 更新字符计数
+              const countSpan = document.querySelector('.detail-content span:last-child');
+              if (countSpan) {
+                countSpan.textContent = res.content.length + ' 字符';
+              }
+            }
+          }
+        } catch (e) {
+          // 轮询失败，静默重试
+        }
+      }, 2000); // 每 2 秒轮询一次
+    }
+
+    function stopContentPolling() {
+      if (contentPollTimer) {
+        clearInterval(contentPollTimer);
+        contentPollTimer = null;
+      }
+      lastContentLength = 0;
+    }
+
+    // ===== 新建任务弹窗 =====
+    function selectTaskType(type) {
+      selectedType = type;
+      document.querySelectorAll('.type-card').forEach(c => c.classList.remove('selected'));
+      document.querySelector(`.type-card[data-type="${type}"]`).classList.add('selected');
+    }
+
+    function showNewTaskModal() {
+      document.getElementById('newTaskModal').classList.add('visible');
+      document.getElementById('promptInput').value = '';
+      document.getElementById('createResult').className = 'modal-result';
+      document.getElementById('createResult').textContent = '';
+      document.getElementById('sendBtn').disabled = false;
+      document.getElementById('sendBtn').textContent = '发送任务';
+      // 重置类型选择
+      selectedType = 'work';
+      document.querySelectorAll('.type-card').forEach(c => c.classList.remove('selected'));
+      document.querySelector('.type-card[data-type="work"]').classList.add('selected');
+      // 同步适配器列表与选择
+      loadAdapters();
+      setTimeout(() => { refreshAdapterSelect(); updateAdapterHint(); }, 0);
+      setTimeout(() => document.getElementById('promptInput').focus(), 100);
+    }
+
+    function hideNewTaskModal() {
+      document.getElementById('newTaskModal').classList.remove('visible');
+    }
+
+    async function createTask() {
+      const prompt = document.getElementById('promptInput').value.trim();
+      if (!prompt) {
+        showResult('请输入任务描述', 'error');
+        return;
+      }
+
+      const adapterId = (document.getElementById('adapterSelect') || { value: 'dumate' }).value || 'dumate';
+
+      const btn = document.getElementById('sendBtn');
+      btn.disabled = true;
+      btn.textContent = '发送中...';
+
+      showResult('⏳ 正在发送到 ' + adapterId + '...', '');
+
+      try {
+        const workspaceId = document.getElementById('workspaceSelect').value;
+        const res = await adapterApi.createTask(adapterId, prompt, {
+          taskType: selectedType,
+          workspaceId: workspaceId,
+        });
+        showResult('✓ ' + res.message, 'success');
+        btn.textContent = '已发送';
+
+        const newConvId = res.conversation_id;
+
+        if (adapterId === 'dumate') {
+          // DuMate：刷新任务列表并自动选中最新任务
+          setTimeout(() => {
+            hideNewTaskModal();
+            refreshTasks().then(() => {
+              if (allTasks.length > 0) selectTask(allTasks[0].task_id);
+            });
+          }, 1500);
+        } else {
+          // 非 DuMate（如 Trae Work）：消息已派发到对应 AI 窗口，
+          // 在弹窗内轮询实时响应，便于用户就地查看。
+          setTimeout(() => hideNewTaskModal(), 2500);
+          startPopupOutputPoll(adapterId, newConvId);
+        }
+      } catch (e) {
+        showResult('✗ 发送失败: ' + e.message, 'error');
+        btn.disabled = false;
+        btn.textContent = '发送任务';
+      }
+    }
+
+    // ===== 弹窗内实时响应轮询（Trae 等无持久任务列表的适配器） =====
+    let _popupPollTimer = null;
+    function startPopupOutputPoll(adapterId, convId) {
+      if (_popupPollTimer) clearInterval(_popupPollTimer);
+      let lastLen = 0;
+      let elapsed = 0;
+      _popupPollTimer = setInterval(async () => {
+        elapsed += 2;
+        try {
+          const res = await adapterApi.getOutput(adapterId, convId, 500);
+          const box = document.getElementById('createResult');
+          if (res && res.found && res.content && res.content.length > lastLen) {
+            const newText = res.content.substring(lastLen);
+            lastLen = res.content.length;
+            if (box && box.classList.contains('success')) {
+              box.textContent = box.textContent + '\n' + newText;
+            }
+          }
+        } catch (e) {}
+        if (elapsed >= 40) { clearInterval(_popupPollTimer); _popupPollTimer = null; }
+      }, 2000);
+    }
+
+    function showResult(msg, type) {
+      const el = document.getElementById('createResult');
+      el.className = 'modal-result ' + type;
+      el.textContent = msg;
+      el.style.display = 'block';
+    }
+
+    // ===== 结束任务 =====
+    async function stopTask(taskId) {
+      if (!confirm('确定要结束任务 ' + taskId + ' 吗？')) return;
+
+      try {
+        const res = await dumateApi.stopTask(taskId);
+        showNotification(res.message, 'success');
+        if (selectedTaskId === taskId) {
+          selectTask(taskId);
+        }
+        refreshTasks();
+      } catch (e) {
+        showNotification('结束失败: ' + e.message, 'error');
+      }
+    }
+
+    // ===== 查看内核日志 =====
+    async function showKernelLog() {
+      try {
+        const info = await dumateApi.discover();
+        showNotification('内核端口: ' + (info.port || '-') + ' · 在线: ' + info.kernel_online, 'info');
+      } catch (e) {
+        showNotification('获取内核信息失败', 'error');
+      }
+    }
+
+    // ===== 查看任务日志 =====
+    async function viewTaskLog(taskId) {
+      try {
+        const log = await dumateApi.getTaskLog(taskId);
+        const panel = document.getElementById('detailBody');
+        if (log.count === 0) {
+          panel.innerHTML += `
+            <div style="margin-top:6px;padding:8px 12px;background:var(--color-bg-card);border:1px solid var(--color-border);border-radius:8px;font-size:11px;color:var(--color-text-muted)">
+              未找到该任务的内核日志
+            </div>`;
+        } else {
+          const logHtml = log.log_lines.map(l =>
+            `<div style="padding:3px 0;font-family:var(--font-mono);font-size:10px;color:var(--color-text-secondary);border-bottom:1px solid var(--color-border)">${escapeHtml(l.line)}</div>`
+          ).join('');
+          panel.innerHTML += `
+            <div style="margin-top:6px;padding:8px 12px;background:var(--color-bg-card);border:1px solid var(--color-border);border-radius:8px">
+              <div style="font-size:10px;color:var(--color-text-muted);margin-bottom:4px">内核日志 (${log.count} 条)</div>
+              ${logHtml}
+            </div>`;
+        }
+      } catch (e) {
+        showNotification('获取日志失败', 'error');
+      }
+    }
+
+    // ===== 复制任务内容 =====
+    async function copyTaskContent(taskId) {
+      try {
+        const content = await dumateApi.getTaskContent(taskId);
+        await navigator.clipboard.writeText(content.content);
+        showNotification('已复制到剪贴板', 'success');
+      } catch (e) {
+        showNotification('复制失败', 'error');
+      }
+    }
+
+    // ===== 工具函数 =====
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function formatTime(isoStr) {
+      if (!isoStr) return '';
+      const d = new Date(isoStr);
+      const now = new Date();
+      const diff = (now - d) / 1000;
+      if (diff < 60) return '刚刚';
+      if (diff < 3600) return Math.floor(diff / 60) + ' 分钟前';
+      if (diff < 86400) return Math.floor(diff / 3600) + ' 小时前';
+      if (diff < 2592000) return Math.floor(diff / 86400) + ' 天前';
+      return d.toLocaleDateString('zh-CN');
+    }
+
+    function showNotification(msg, type) {
+      const el = document.getElementById('listStatus');
+      el.textContent = msg;
+      el.style.color = type === 'success' ? 'var(--color-success)' : type === 'error' ? 'var(--color-error)' : 'var(--color-text-secondary)';
+      setTimeout(() => {
+        el.style.color = 'var(--color-text-muted)';
+        el.textContent = '自动刷新中';
+      }, 3000);
+    }
+  </script>
+</body>
+</html>

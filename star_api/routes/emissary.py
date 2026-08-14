@@ -145,6 +145,8 @@ async def get_emissary_status(star_id: str):
         "adapter_name": em.adapter.config.name,
         "status": em.status.value,
         "history_count": len(em.history),
+        "interaction_mode": em.interaction_mode,
+        "cdp_available": em.cdp_available,
     }
     
     if em.last_turn:
@@ -597,4 +599,80 @@ async def discover_logs():
     return {
         "agents": reader.get_supported_types(),
         "total_loggable": sum(1 for a in reader.get_supported_types() if a["has_logs"]),
+    }
+
+
+@router.get("/{star_id}/cdp")
+async def get_cdp_info(star_id: str):
+    """
+    获取 CDP 连接信息（用于 Trae 等 Electron 应用）
+
+    返回 CDP 端口状态、可用 targets、交互模式等。
+
+    Args:
+        star_id: 星体 ID 或 PID
+
+    Returns:
+        CDP 连接信息
+    """
+    em = _get_emissary(star_id)
+
+    if not hasattr(em, "_trae_cdp") or em._trae_cdp is None:
+        return {
+            "star_id": star_id,
+            "cdp_available": False,
+            "reason": "no_cdp_config",
+            "message": "该 Agent 未配置 CDP。请在 ai-agents.yaml 中添加 cdp 段。",
+        }
+
+    bridge = em._trae_cdp
+    alive = bridge.is_alive()
+
+    result = {
+        "star_id": star_id,
+        "cdp_available": alive,
+        "interaction_mode": em.interaction_mode,
+        "port": bridge.port,
+    }
+
+    if alive:
+        # 列出 targets
+        target = bridge.find_chat_target()
+        if target:
+            result["target"] = {
+                "id": target.get("id", "")[:40],
+                "title": target.get("title", "")[:60],
+                "url": target.get("url", "")[:80],
+            }
+        else:
+            result["target"] = None
+            result["target_message"] = "未找到匹配的 target"
+
+    return result
+
+
+@router.post("/{star_id}/cdp/probe")
+async def probe_cdp_globals(star_id: str):
+    """
+    探测 Trae 渲染器中的全局对象（用于发现内部 IPC 接口）
+
+    Args:
+        star_id: 星体 ID 或 PID
+
+    Returns:
+        全局对象探测结果
+    """
+    em = _get_emissary(star_id)
+
+    if not hasattr(em, "_trae_cdp") or em._trae_cdp is None:
+        raise HTTPException(status_code=400, detail="该 Agent 未配置 CDP")
+
+    bridge = em._trae_cdp
+    if not bridge.is_alive():
+        raise HTTPException(status_code=503, detail="CDP 端口不可达")
+
+    result = bridge.probe_globals()
+    return {
+        "star_id": star_id,
+        "globals": result,
     }
