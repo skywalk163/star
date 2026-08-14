@@ -319,3 +319,44 @@ Trae 是基于 VS Code 的 Electron 应用。通过 `--remote-debugging-port=922
 1. **短期**：实现 CDP-based Trae adapter，替代 GUI 自动化
 2. **中期**：研究 AhaNet SDK 的 token 刷新机制，尝试通过 Hook 获取 token
 3. **长期**：如果 Trae 开放官方 API，直接迁移到官方 API
+
+## 12. CDP 从 code CLI 被移除的调查（v0.1.50）
+
+> 追加于 2026-08-14 第二轮深挖：目标——确认 Trae 何时、为何把 `--remote-debugging-port`
+> 从命令行拿掉，并判断 argv.json 是否仍是 0.1.50 唯一可行通道。
+
+### 12.1 结论
+
+- **何时**：介于 `v0.1.48`（build `20260806`，本文档 §8 当时仍把 CLI 标志列为"推荐方案"）与当前安装版本 `v0.1.50` 之间。大概率落在 **v0.1.49 或 v0.1.50** 的静默安全加固，**未写入公开更新日志**（trae.cn/changelog 在该区间无任何 CDP/命令行安全条目；0.1.49 甚至未单列）。
+- **为何**：安全收敛。开放 `--remote-debugging-port` 等价于在渲染器暴露完整 `Runtime.evaluate`，经内部 `AhaIPC`/`browser`/`Hub` 服务即可控制整个 AI Agent、文件系统与云端 API——是"任意本地进程都能拉起一个带调试端口的 Trae"的本地 RCE/自动化劫持面。与 ByteDance 同期加固一致：AhaNet JWT 加密存储（§6）、Hub token 不可提取、2025-12-23「命令行运行更安全」沙箱化。
+- **机制（挖的一层）**：他们**没有**把 `remote-debugging-port` 从选项 schema 删掉（CLI 全局选项 `global` 仍含该项，且 `onUnknownOption` 为空操作→未知全局选项静默忽略、不报 "bad option"）；他们移除的是 **CLI 标志 → Chromium 的转发**。唯一仍被 honor 的通道是 `argv.json`（`%APPDATA%/.trae-cn/argv.json`）。
+
+### 12.2 源码证据（resources/app/out/main.js）
+
+- argv.json 路径：`argvResource` getter → `userHome/.trae-cn/argv.json`（dataFolderName=`.trae-cn`）。
+- argv.json 维护：`ib()` 仅自动补全 `enable-crash-reporter`/`crash-reporter-id`；`jb()` 做 JSONC 修复。
+- **关键 `GBe()`（@~2643000）** 即 readArgvJson 允许列表应用器：
+  ```js
+  const e=["disable-hardware-acceleration","force-color-profile",
+           "disable-lcd-text","proxy-bypass-list","remote-debugging-port"];
+  const r=JBe();              // 读 argv.json
+  Object.keys(r).forEach(c=>{
+    if(e.indexOf(c)!==-1) cr.commandLine.appendSwitch(c,l);  // 转发给 Chromium
+  });
+  ```
+  即：`argv.json` 里的 `remote-debugging-port` **仍被 `appendSwitch` 转发到 Chromium** → 0.1.50 仍开 CDP。
+- 全部 `appendSwitch` 调用（14 处）中，唯有 `GBe()` 经 argv.json 处理 `remote-debugging-port`；**没有任何代码从 `process.argv` 转发该标志** → CLI 传参被吞、CDP 不开。
+- 历史 `%APPDATA%/TRAE SOLO CN/DevToolsActivePort` 内容 `9223|...` 印证该端口曾由 argv.json 路径开启。
+
+### 12.3 product.json / 内部 API 是否还有别的通道
+
+- **product.json**（resources/app/product.json，appVersion=0.1.50）：**无**任何 CDP/远程调试开关键；`bootConfig` 全是云端端点，不含 devtools 端口。
+- **环境变量**：无 `VSCODE_*` / `ELECTRON_*` 捷径可开 CDP。
+- **内部 AhaIPC `browser` 服务**（`check_browser_tools_enabled` 等）：是「Browser Use」浏览器工具能力，**非** CDP 端口开启器。
+- `cloudide.icube-devtool-ports` 扩展（product.json 列出 workspacePath=extensions/icube-devtool-ports）在本机安装 resources 中**未落地**（按需从市场拉取），不构成稳定通道。
+- **结论：argv.json 是 0.1.50 唯一被官方保留的 escape hatch**——它需要写入用户 profile 目录（与「启用崩溃上报」同级的显式、需用户授权的高权限动作），而 CLI 标志是「任意自动化可随意触发」的低门槛路径，故被关闭。
+
+### 12.4 对 Star 集成的影响
+
+- Star 当前方案（写 `argv.json` 的 `remote-debugging-port=9223` + 清 `code.lock` + 零参数重启 Trae）**正是 0.1.50 的预期正确路径**，方向无误。
+- 无需、也不可依赖 CLI 标志。沙箱非交互会话无法实测 9223，但机制已由 `GBe()` 源码 + 历史 `DevToolsActivePort` 双重证实；用户在桌面会话重启一次 Trae 即可被 Star 以 9223 连上。
