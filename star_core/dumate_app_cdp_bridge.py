@@ -23,11 +23,16 @@ CSS-module 类名带构建哈希（``markdownBody-YMvJCu``），跨版本会变�
 **聚焦后走 CDP ``Input.insertText``**（浏览器真实输入管线），实测生效且发送按钮
 随即从 disabled 解禁。清空则聚焦 + ``selectAll`` + Backspace。
 
-状态检测：空闲时只有 ``button[title="发送"]``。生成中的判据用「出现停止按钮」
-（``title``/``aria-label`` 含「停止/中止/Stop」）——**此判据尚未在真实生成过程中
-观测到命中**：实测用例（短问答）在 3 秒内就回完了，全程 :meth:`get_status` 都是
-``idle``。因此 ``generating`` 目前不可依赖，轮询完成请以「最后一条消息文本停止增长」
-为准，不要只看 :meth:`get_status`。
+状态检测：空闲时只有 ``button[title="发送"]``；生成中会额外出现
+``button[title="停止"]``，生成结束后「停止」消失、换成「分享」。实测一次约 18 秒的
+长回答，:meth:`get_status` 在 +2s~+16s 稳定返回 ``generating``、+18s 转 ``idle``，
+判据可靠。（短问答若 3 秒内答完，轮询可能整段错过 ``generating`` 窗口，所以"是否
+写完"更稳妥的判据是 :meth:`get_latest_response` 文本不再增长。）
+
+消息角色：助手回复所在容器带 ``data-message-role="assistant"`` 与
+``data-assistant-block-id``，外层列表容器带 ``data-message-list-content="true"``，
+因此可以精确取助手回复，不必赌"最后一条消息"。用户自己发的消息不在
+``markdownBody`` 里。
 """
 
 from __future__ import annotations
@@ -59,6 +64,9 @@ _STOP_SEL = (
 
 #: 每条消息正文（markdown 渲染容器）
 _MSG_SEL = '[class*="markdownBody"]'
+
+#: 助手回复容器标记（外层带 data-message-role="assistant"）
+_ASSISTANT_MSG_SEL = '[data-message-role="assistant"] [class*="markdownBody"]'
 
 #: 新建任务按钮
 _NEW_TASK_SEL = 'button[aria-label="新任务"]'
@@ -108,9 +116,13 @@ _SEND_ENABLED_JS = _js(
     "return !!b && !b.disabled;"
 )
 
-#: JS：读取最后一条消息正文
+#: JS：读取最后一条助手回复正文
+#:
+#: 优先取带 data-message-role="assistant" 的回复；取不到（DOM 变体）再退回全部
+#: markdownBody 的最后一条。用户自己发的消息不在 markdownBody 里，故不会误取。
 _READ_LATEST_JS = _js(
-    "const items=document.querySelectorAll(" + json.dumps(_MSG_SEL) + ");"
+    "let items=document.querySelectorAll(" + json.dumps(_ASSISTANT_MSG_SEL) + ");"
+    "if(!items.length)items=document.querySelectorAll(" + json.dumps(_MSG_SEL) + ");"
     "if(!items.length)return {text:'',count:0};"
     "const last=items[items.length-1];"
     "return {text:(last.innerText||'').trim().slice(0,8000),count:items.length};"
@@ -319,10 +331,11 @@ class DuMateAppCDPBridge:
     # ------------------------------------------------------------------
 
     def get_latest_response(self) -> str:
-        """读取最后一条消息正文（尽力而为）。
+        """读取最后一条**助手回复**正文。
 
-        DOM 上无稳定的 user/assistant 角色标记，返回的「最后一条」可能是刚发出
-        的用户消息。需要区分角色时应结合 :meth:`get_status` 轮询到 idle 后再读。
+        依据 ``data-message-role="assistant"`` 定位，不会把用户自己发的消息当成
+        回复。生成中调用会拿到当时已流式渲染出的片段，需要完整回答请轮询到
+        :meth:`get_status` 转 ``idle``、或文本长度不再增长。
         """
         target = self.find_chat_target()
         if not target:
@@ -333,9 +346,9 @@ class DuMateAppCDPBridge:
     def get_status(self) -> str:
         """检测状态：``idle`` / ``generating`` / ``unknown``。
 
-        ``generating`` 依赖「停止按钮出现」这一判据，尚未在真实生成过程中观测到
-        命中（见模块 docstring）。判断回答是否写完，请以
-        :meth:`get_latest_response` 的文本不再增长为准。
+        生成中会出现 ``button[title="停止"]``，实测长回答期间稳定命中；短问答若在
+        一次轮询间隔内答完，可能整段错过 ``generating``，"是否写完"更稳妥的判据是
+        :meth:`get_latest_response` 文本不再增长。
         """
         target = self.find_chat_target()
         if not target:
