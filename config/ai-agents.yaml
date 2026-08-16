@@ -166,6 +166,14 @@ agents:
         - "搭子DuMate"
     window_types:
       chat: "default"
+    # DuMate 桌面端（DuMate.exe / 百度搭子）需带 --remote-debugging-port 启动才有 CDP。
+    # 单实例应用，且不读 argv.json，只能命令行直传端口并重启（见
+    # star_core/dumate_app_launcher.py）。启动器会剔除 ELECTRON_* 环境变量，
+    # 否则 DuMate.exe 会退化为纯 Node 而启动即退出。
+    cdp:
+      port: 9225
+      type: electron
+      url_pattern: "index.html"
 
   # ========== 浏览器类 AI Agent ==========
 

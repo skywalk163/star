@@ -15,6 +15,7 @@ import itertools
 import json
 import logging
 import re
+import threading
 import time
 import urllib.error
 import urllib.request
@@ -34,6 +35,7 @@ _TAB_FIELDS: tuple[str, ...] = ("id", "title", "url", "webSocketDebuggerUrl")
 _KEY_CODES: dict[str, tuple[int, str]] = {
     "Enter": (13, "Enter"),
     "Escape": (27, "Escape"),
+    "Backspace": (8, "Backspace"),
 }
 
 
@@ -165,6 +167,19 @@ class CDPBridge:
             return None
         return {k: value.get(k) for k in ("x", "y", "width", "height")}
 
+    def insert_text(self, tab: dict, text: str) -> bool:
+        """通过 ``Input.insertText`` 向当前焦点元素插入文本。
+
+        与 :meth:`set_value` 的区别：``set_value`` 直接改 ``el.value``，只适用于
+        原生 input/textarea；富文本编辑器（Lexical / ProseMirror / Slate）把内容
+        存在自己的 model 里，直接改 DOM 不会被感知。``Input.insertText`` 走浏览器
+        真实输入管线，编辑器能正常收到 ``beforeinput``/``input``。
+
+        调用前需先让目标元素获得焦点（例如 ``evaluate(tab, "el.focus()")``）。
+        """
+        resp = self._send(tab, "Input.insertText", {"text": text})
+        return resp is not None and "error" not in resp
+
     def send_key(self, tab: dict, key: str) -> bool:
         """通过 Input.dispatchKeyEvent 发送按键（Enter / Escape）。
 
@@ -235,13 +250,44 @@ class CDPBridge:
         last_exc: Exception | None = None
         for attempt in range(len(_RECONNECT_DELAYS) + 1):
             try:
-                return asyncio.run(self._send_async(ws_url, method, payload))
+                return self._run_coro(self._send_async(ws_url, method, payload))
             except Exception as exc:
                 last_exc = exc
                 if attempt < len(_RECONNECT_DELAYS):
                     time.sleep(_RECONNECT_DELAYS[attempt])
         logger.warning("CDP 命令失败: %s (%s)", method, last_exc)
         return None
+
+    @staticmethod
+    def _run_coro(coro):
+        """运行一个协程并返回结果。
+
+        在 FastAPI 的异步端点里，当前线程已有运行中的事件循环，此时
+        asyncio.run() 会抛 "cannot be called from a running event loop"，
+        导致 CDP 调用整体失败（HTTP 500）。故检测到运行中的循环时，改在
+        独立线程里用全新循环执行，避免阻塞并绕开该限制。
+        """
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            # 无运行中的事件循环：直接 asyncio.run
+            return asyncio.run(coro)
+
+        # 已在事件循环线程上：换独立线程 + 新循环执行
+        result: dict = {}
+
+        def _worker() -> None:
+            try:
+                result["value"] = asyncio.run(coro)
+            except Exception as exc:  # noqa: BLE001
+                result["error"] = exc
+
+        t = threading.Thread(target=_worker, daemon=True)
+        t.start()
+        t.join()
+        if "error" in result:
+            raise result["error"]
+        return result.get("value")
 
     async def _send_async(
         self,
