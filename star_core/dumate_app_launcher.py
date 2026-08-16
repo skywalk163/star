@@ -66,6 +66,25 @@ _EXE_CANDIDATES: Tuple[str, ...] = (
 #: 主进程可执行名（小写）
 _MAIN_EXE_NAME = "dumate.exe"
 
+#: 保持渲染器持续合成的启动开关。
+#:
+#: Chromium 在窗口被**完全遮挡**时会走 Native Window Occlusion Tracking，把窗口
+#: 当作隐藏并停止渲染前台页面——效果与最小化一致：``visibilityState`` 变
+#: ``hidden``、``requestAnimationFrame`` 冻结、``Page.startScreencast`` 零帧、
+#: ``Input.*`` 事件被节流（实测最小化时鼠标事件往返被拖到 5 秒）。Electron 通过
+#: subclass WindowTreeHost 主动开启了该跟踪，故 DuMate 默认会受影响。
+#:
+#: 两个开关互为保险：前者是命令行 switch；后者是 feature 形式
+#: （``chrome://flags`` 里的同名界面项已被上游移除，但 ``--disable-features``
+#: 这条路径独立存在）。
+#:
+#: 注意：这两个开关**不能解决最小化**——最小化是 OS 级的，窗口没有可合成的表面。
+_RENDER_KEEPALIVE_FLAGS: Tuple[str, ...] = (
+    "--disable-backgrounding-occluded-windows",
+    "--disable-features=CalculateNativeWindowOcclusion",
+)
+
+
 #: sidecar 可执行名（小写）；停止时一并清扫，避免端口残留
 _SIDECAR_EXE_NAMES = frozenset(
     {
@@ -263,12 +282,11 @@ def launch_dumate_app_with_cdp(
         # 单实例锁：带新开关的进程无法与旧实例并存，必须先停
         stop_dumate_app()
 
-    logger.info(
-        "launch_dumate_app_with_cdp: 启动 %s --remote-debugging-port=%d", exe, port
-    )
+    args = [exe, f"--remote-debugging-port={port}", *_RENDER_KEEPALIVE_FLAGS]
+    logger.info("launch_dumate_app_with_cdp: 启动 %s", " ".join(args))
     try:
         subprocess.Popen(
-            [exe, f"--remote-debugging-port={port}"],
+            args,
             env=_clean_launch_env(),
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,

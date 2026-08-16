@@ -298,22 +298,23 @@ class DuMateAppAdapter(AIAdapter):
         task_id: str,
         max_lines: int = 200,
     ) -> Optional[str]:
-        """获取 DuMate 的最新 AI 响应
+        """获取**本轮**任务的 AI 响应
 
-        通过 CDP 的 DOM 查询获取聊天区域中最后一条助手回复（依据
-        ``data-message-role="assistant"``）。
+        通过 CDP 的 DOM 查询获取助手回复（依据 ``data-message-role="assistant"``），
+        并且只返回 :meth:`create_task` 之后**新出现**的那条——旧回答一直留在 DOM
+        里，不做这层判别的话刚发完就读会拿到上一轮的回答，看起来像"秒回"。
 
         Args:
-            task_id: 忽略（读取最新响应）
+            task_id: 忽略（DuMate 桌面端没有任务 id，按"本轮"语义读取）
             max_lines: 最大行数
 
         Returns:
-            响应文本，未找到返回 None
+            响应文本；本轮回复尚未出现（仍在等生成）返回 None
         """
         if not self._connected:
             return None
 
-        text = self._bridge.get_latest_response()
+        text = self._bridge.get_new_response()
         if not text:
             return None
 

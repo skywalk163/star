@@ -33,6 +33,12 @@ CSS-module 类名带构建哈希（``markdownBody-YMvJCu``），跨版本会变�
 ``data-assistant-block-id``，外层列表容器带 ``data-message-list-content="true"``，
 因此可以精确取助手回复，不必赌"最后一条消息"。用户自己发的消息不在
 ``markdownBody`` 里。
+
+**旧回答残留这个坑必须绕**：上一轮的助手回复一直留在 DOM 里，所以"发完立刻读最后
+一条"会拿到上一轮的答案——看起来像秒回，实际新回答还没开始生成（真实踩过：一次
+测试里问 A 得到的是上一次问 B 的答案，却被当成通过）。:meth:`DuMateAppCDPBridge.
+send_message` 因此会记录发送前的回复条数基线，:meth:`DuMateAppCDPBridge.
+get_new_response` 只在条数超过基线时才返回文本。判断"写完"仍以文本长度不再增长为准。
 """
 
 from __future__ import annotations
@@ -178,6 +184,11 @@ class DuMateAppCDPBridge:
     def __init__(self, port: int = DEFAULT_DUMATE_APP_CDP_PORT):
         self.port = port
         self._cdp = CDPBridge(port=port)
+        #: 最近一次 send_message 前的助手回复条数基线。
+        #: 用于区分"本轮的新回复"与"上一轮的残留回复"——DOM 里旧回答一直在，
+        #: 发完就读会拿到旧的（曾导致误判发送成功）。None 表示尚未发过。
+        self._response_baseline: int | None = None
+
 
     # ------------------------------------------------------------------
     # 连接与 target 发现
@@ -284,6 +295,11 @@ class DuMateAppCDPBridge:
             self._cdp.evaluate(target, _CLICK_NEW_TASK_JS)
             time.sleep(0.6)
 
+        # 记录回复条数基线。必须在「新任务」点击之后取——开新会话会把消息列表清空，
+        # 用旧会话的条数当基线会导致新回复被误判为"还没出现"。
+        snap = self._cdp.evaluate(target, _READ_LATEST_JS)
+        baseline = snap.get("count", 0) if isinstance(snap, dict) else 0
+
         draft = self._cdp.evaluate(target, _GET_INPUT_JS)
         if isinstance(draft, dict) and draft.get("text") and not overwrite:
             logger.warning(
@@ -324,24 +340,55 @@ class DuMateAppCDPBridge:
             return False
 
         logger.info("DuMateAppCDP: 消息已发送 (%d 字)", len(text))
+        self._response_baseline = baseline
         return True
 
     # ------------------------------------------------------------------
     # 读取与状态
     # ------------------------------------------------------------------
 
-    def get_latest_response(self) -> str:
-        """读取最后一条**助手回复**正文。
+    def read_latest(self) -> dict:
+        """读取最后一条助手回复及当前回复条数。
 
-        依据 ``data-message-role="assistant"`` 定位，不会把用户自己发的消息当成
-        回复。生成中调用会拿到当时已流式渲染出的片段，需要完整回答请轮询到
-        :meth:`get_status` 转 ``idle``、或文本长度不再增长。
+        Returns:
+            ``{"text": str, "count": int}``；页面不可达时 count 为 -1，
+            以便与"页面正常但还没有任何回复"（count=0）区分。
         """
         target = self.find_chat_target()
         if not target:
-            return ""
+            return {"text": "", "count": -1}
         result = self._cdp.evaluate(target, _READ_LATEST_JS)
-        return result.get("text", "") if isinstance(result, dict) else ""
+        if not isinstance(result, dict):
+            return {"text": "", "count": -1}
+        return {"text": result.get("text", ""), "count": int(result.get("count", 0))}
+
+    def get_latest_response(self) -> str:
+        """读取最后一条**助手回复**正文，不区分是哪一轮的。
+
+        依据 ``data-message-role="assistant"`` 定位，不会把用户自己发的消息当成
+        回复。但**旧回答一直留在 DOM 里**，所以刚发完就调用会拿到上一轮的回答。
+        要确认"本轮"的回复，用 :meth:`get_new_response`。
+        """
+        return self.read_latest()["text"]
+
+    def get_new_response(self) -> str | None:
+        """只返回**本次 send_message 之后新出现**的助手回复；尚未出现返回 None。
+
+        判据是回复条数超过 :meth:`send_message` 记录的基线。这是为了消除一个真实
+        踩过的坑：发完立刻读会拿到上一轮的旧回答，看起来像"秒回"，实际新回答还
+        没开始生成。
+
+        还没调用过 send_message（无基线）时退化为 :meth:`get_latest_response`。
+        生成中调用会拿到已流式渲染出的片段，需要完整回答请等文本长度不再增长。
+        """
+        snap = self.read_latest()
+        if snap["count"] < 0:
+            return None
+        if self._response_baseline is None:
+            return snap["text"] or None
+        if snap["count"] <= self._response_baseline:
+            return None
+        return snap["text"] or None
 
     def get_status(self) -> str:
         """检测状态：``idle`` / ``generating`` / ``unknown``。
