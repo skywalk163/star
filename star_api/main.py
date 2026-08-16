@@ -144,6 +144,7 @@ async def lifespan(app: FastAPI):
     from star_core.ai_adapter import get_adapter_registry
     from star_core.dumate_bridge import DuMateBridge
     from star_core.trae_work_adapter import TraeWorkAdapter
+    from star_core.dumate_app_adapter import DuMateAppAdapter
 
     registry = get_adapter_registry()
 
@@ -169,6 +170,22 @@ async def lifespan(app: FastAPI):
             logger.info("🔌 TraeWork 适配器已注册 (CDP 端口不可达，请以 --remote-debugging-port=9223 启动 Trae)")
     except Exception as e:
         logger.warning("🔌 TraeWork 适配器注册失败: %s", e)
+
+    # 注册 DuMate 桌面端适配器（DuMate.exe / 百度搭子，CDP 9225）
+    # 注意：只在端口已通时连接，不会为了开调试端口去重启用户正在用的 DuMate
+    try:
+        dumate_app = DuMateAppAdapter()
+        if dumate_app.is_alive():
+            dumate_app.connect()
+            logger.info("🔌 DuMate 桌面端适配器已注册 (connected=%s)", dumate_app.connected)
+        else:
+            logger.info(
+                "🔌 DuMate 桌面端适配器已注册 (CDP 端口 %d 不可达，"
+                "需以 --remote-debugging-port=%d 重启 DuMate)",
+                dumate_app.port, dumate_app.port,
+            )
+    except Exception as e:
+        logger.warning("🔌 DuMate 桌面端适配器注册失败: %s", e)
 
     # 列出所有已注册适配器
     adapters = registry.list_adapters()
