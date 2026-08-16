@@ -1,22 +1,22 @@
-<#
+﻿<#
 .SYNOPSIS
 检查群星 Star API 服务状态
 #>
 
-$ProjectRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+$ProjectRoot = Split-Path -Parent $PSScriptRoot
 $PidFile = Join-Path $ProjectRoot "logs\star.pid"
 $LogFile = Join-Path $ProjectRoot "logs\star.log"
 
 Write-Host "=== 群星 Star 状态 ===" -ForegroundColor Cyan
 
-# PID 检查
+# PID 检查（$Pid 是只读自动变量，改用 $ServerPid）
 if (Test-Path $PidFile) {
-    $Pid = Get-Content $PidFile -Raw -ErrorAction SilentlyContinue
-    if ($Pid) {
-        $Pid = $Pid.Trim()
-        $Process = Get-Process -Id $Pid -ErrorAction SilentlyContinue
+    $ServerPid = Get-Content $PidFile -Raw -ErrorAction SilentlyContinue
+    if ($ServerPid) {
+        $ServerPid = $ServerPid.Trim()
+        $Process = Get-Process -Id $ServerPid -ErrorAction SilentlyContinue
         if ($Process) {
-            Write-Host "服务状态: 运行中 (PID: $Pid)" -ForegroundColor Green
+            Write-Host "服务状态: 运行中 (PID: $ServerPid)" -ForegroundColor Green
             Write-Host "进程名称: $($Process.ProcessName)" -ForegroundColor Gray
             Write-Host "内存使用: $([math]::Round($Process.WorkingSet64 / 1MB, 1)) MB" -ForegroundColor Gray
             Write-Host "启动时间: $($Process.StartTime)" -ForegroundColor Gray

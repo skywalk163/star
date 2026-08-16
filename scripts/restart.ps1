@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
 重启群星 Star API 服务
 #>

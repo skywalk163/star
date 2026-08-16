@@ -11,25 +11,38 @@ import time
 from contextlib import asynccontextmanager
 from typing import Optional
 
-import yaml
+# 依赖/模块自检：任一核心依赖或 star_core 包缺失时，给出可直接照做的指引，
+# 而不是抛出裸 ImportError 让新用户一头雾水。
+try:
+    import yaml
 
-from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
-from loguru import logger
+    from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
+    from fastapi.middleware.cors import CORSMiddleware
+    from fastapi.staticfiles import StaticFiles
+    from fastapi.responses import FileResponse
+    from loguru import logger
 
-from star_core.observability import get_metrics_registry
+    from star_core.observability import get_metrics_registry
 
-from star_api import state
+    from star_api import state
 
-from star_core import (
-    StarSeeker, StarAssigner, StarGazer, OrbitEngine,
-    Nova, StarStatus, StarPriority, Constellation, ConstellationStatus,
-    ConstellationStorage, ResultComparator
-)
-from star_core.plugin_system import PluginManager
-from star_core.analytics import HistoryStore, StarAnalytics
+    from star_core import (
+        StarSeeker, StarAssigner, StarGazer, OrbitEngine,
+        Nova, StarStatus, StarPriority, Constellation, ConstellationStatus,
+        ConstellationStorage, ResultComparator
+    )
+    from star_core.plugin_system import PluginManager
+    from star_core.analytics import HistoryStore, StarAnalytics
+except ImportError as exc:
+    _root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    sys.stderr.write(
+        "\n[群星 Star] 启动失败：缺少依赖或模块导入错误。\n"
+        f"  详情: {exc}\n\n"
+        "请在项目根目录执行以下命令安装依赖后重试：\n"
+        f'  python -m pip install -r "{os.path.join(_root, "requirements.txt")}"\n\n'
+        "若仍失败，请确认从项目根目录启动（scripts\\start.ps1 会自动切换工作目录）。\n"
+    )
+    raise SystemExit(1) from exc
 
 
 # ==================== 配置加载 ====================
