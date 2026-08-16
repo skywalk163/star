@@ -32,7 +32,11 @@ async function apiFetch(path, options = {}) {
     headers,
     ...options,
   });
-  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+  if (!res.ok) {
+    const err = new Error(`${res.status} ${res.statusText}`);
+    err.status = res.status;   // 便于调用方区分 401（缺 Key）和其它失败
+    throw err;
+  }
   return res.json();
 }
 

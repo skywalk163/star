@@ -127,7 +127,7 @@
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                     群星（Star）前端                          │
-│   (Web UI: React + Vite, 或 Electron 桌面端)                 │
+│   (静态 Web UI: star-ui/，由服务端 /ui 直接托管)              │
 │   星图面板 │ 星轨队列 │ 星语流 │ 星辉审查                      │
 └───────────────────────────┬─────────────────────────────────┘
                             │ WebSocket / IPC
@@ -175,56 +175,79 @@
 ### 环境要求
 
 - **操作系统**：Windows 10 / Windows 11
-- **Python**：>= 3.12
+- **Python**：>= 3.10（开发环境用 3.12）
 - **权限**：建议以管理员权限运行（部分 UI Automation 功能需要）
 
-### 安装
+### 一键启动（推荐）
 
-```bash
-# 克隆项目
-cd g:\traework\star
+双击项目根目录的 **`启动群星.bat`** 即可。脚本会：
 
-# 安装依赖（推荐使用虚拟环境）
+1. 自动找到 `.venv`，没有则回退到 PATH 上的 Python；
+2. 自检依赖，缺包时直接打印可复制的 `pip install` 命令；
+3. 首次运行自动从 `config.example.yaml` 生成本机 `config.yaml`，并**分配一份随机 API Key**（会打印在控制台，也可随时在 `config.yaml` 查看）；
+4. 启动服务并打印可点击的控制台地址。
+
+启动后控制台会显示：
+
+```
+[星辉] 控制台: http://127.0.0.1:8765/ui/pages/starmap.html
+```
+
+### 手动安装 / 启动
+
+```powershell
+# 1) 建虚拟环境并装依赖
 python -m venv .venv
-.venv\Scripts\activate
-pip install -e ".[dev]"
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt        # 或 pip install -e ".[dev]"
+
+# 2) 启动（前台）
+.\scripts\start.ps1
+
+# 常用管理脚本
+.\scripts\status.ps1     # 查看运行状态
+.\scripts\stop.ps1       # 停止服务
+.\scripts\restart.ps1    # 重启
+
+# 或直接用 uvicorn（需在项目根目录执行）
+python -m uvicorn star_api.main:app --host 127.0.0.1 --port 8765
 ```
 
-### 启动服务
+> 默认只监听 `127.0.0.1`。本服务能操控你本机的 AI 软件与键鼠，**改成 `0.0.0.0` 会把这些能力暴露到局域网**，务必先在 `config.yaml` 换掉默认 API Key、并确认网络可信。
 
-```bash
-# 启动 API 服务
-uvicorn star_api.main:app --reload --host 0.0.0.0 --port 8765
+### 首次使用：填入 API Key
 
-# 或直接运行
-python -m uvicorn star_api.main:app --reload --port 8765
+服务默认开启认证。首次启动时控制台会打印生成的管理员/只读 Key，例如：
+
 ```
+[群星 Star] 首次运行，已生成 .../config.yaml，并为你分配了独立的 API Key：
+    管理员密钥: star-admin-xxxxxxxx...
+    只读密钥: star-viewer-xxxxxxxx...
+```
+
+打开 Web 界面后，进入 **设置 → API Key**，粘贴管理员 Key 保存即可（保存在浏览器本地）。之后所有页面的请求都会自动带上该 Key。
 
 ### 验证安装
 
-打开浏览器访问：
+浏览器访问：
 
-- **API 文档**：http://localhost:8765/docs
-- **健康检查**：http://localhost:8765/health
-- **校准器**：http://localhost:8765/ui/pages/calibrator.html（v4 混合定位器配置工具）
-- **星图控制面板**：http://localhost:8765/ui/pages/starmap.html
+- **星图控制面板**：http://127.0.0.1:8765/ui/pages/starmap.html
+- **API 文档**：http://127.0.0.1:8765/docs
+- **健康检查**：http://127.0.0.1:8765/health
 
-### AI Agent 任务管控（v4）
+### 通过 Web 控制 AI GUI 软件
 
-群星 v4 支持通过 Web 统一管理无官方 API 的 AI Agent 软件（Trae Work、DuMate、
-WorkBuddy、浏览器网页 AI）：
+群星支持从 Web 界面统一管理无官方 API 的桌面/网页 AI（Trae、DuMate 桌面端、Comate 等），
+底层通过 Chrome DevTools Protocol (CDP) 直连各应用。端口约定：
 
-| 能力 | 路径 |
-|------|------|
-| 提交任务 | `POST /api/stars/{pid}/send` 或 WebSocket 消息 |
-| 查看任务 | `GET /api/stars/{pid}/windows/{hwnd}/tasks`（官方日志优先，OCR 兜底） |
-| 停止生成 | `POST /api/stars/{pid}/stop`（停止当前生成，不杀进程） |
-| 定位器校准 | `GET/POST /api/locators/*` + 校准器前端页面 |
+- `9223` = Trae
+- `9224` = Comate
+- `9225` = DuMate 桌面端
 
-交互由 `config/ai-agents.yaml` 的 `interaction` 段驱动（定位器链：UIA → 视觉 OCR →
-坐标比例 / 浏览器 CDP 直连）。详细设计见 `docs/architecture.md` 的 v4 章节。
+在 **`/ui/pages/dumate.html`** 适配器面板即可连接 / 重启对应应用并下发任务。适配器统一
+经由 `GET /api/dumate/adapters` 与 `/api/dumate/adapters/{ai_id}/*` 系列接口驱动。
 
-### 快速体验
+### 快速体验（Python）
 
 ```python
 import asyncio
@@ -232,25 +255,22 @@ from star_core import OrbitEngine, Nova, StarPriority
 
 async def main():
     engine = OrbitEngine()
-    
-    # 扫描星体
     stars = engine.star_seeker.scan_skies()
     print(f"发现 {len(stars)} 颗星")
-    
-    # 创建任务
+
     nova = Nova(
         id="",
         title="生成用户登录模块",
         description="用 Python 编写一个用户登录验证模块",
         starlight="请用 Python 实现一个用户登录模块，包含密码哈希验证和 JWT 令牌生成。",
-        priority=StarPriority.NORMAL
+        priority=StarPriority.NORMAL,
     )
-    
     nova_id = await engine.birth_nova(nova)
     print(f"新星诞生: {nova_id}")
 
 asyncio.run(main())
 ```
+
 
 ---
 

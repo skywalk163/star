@@ -1,0 +1,65 @@
+# 群星 Star 配置模板
+#
+# 首次启动时，本文件会被复制成 config.yaml，同时 auth.api_keys 里的占位 Key
+# 会被替换成本机独有的随机值（控制台会打印出来）。config.yaml 不入库，
+# 所以你的 Key 不会被提交。想改配置请改 config.yaml，不要改本文件。
+
+server:
+  name: 群星 Star API
+  # 只监听本机。改成 0.0.0.0 会把远程键鼠、截屏能力暴露到局域网，
+  # 请确认网络可信、且已换掉下面的 API Key 再改。
+  host: 127.0.0.1
+  port: 8765
+  log_level: INFO
+  reload: false
+  workers: 1
+
+auth:
+  # 本服务能操控你的 AI 软件和键鼠，关掉认证等于把这些能力开放给
+  # 任何能访问该端口的人。除非确定只在本机用，否则不要关。
+  enabled: true
+  header_name: X-API-Key
+  # 占位值，首次生成 config.yaml 时会被替换成随机 Key
+  api_keys:
+    - key: star-admin-key
+      name: 管理员密钥
+      role: admin
+    - key: star-viewer-key
+      name: 只读密钥
+      role: viewer
+
+cdp:
+  # 通用 CDP 端口。各 AI 软件的固定端口约定：
+  #   9223 = Trae, 9224 = Comate, 9225 = DuMate 桌面端
+  port: 9222
+  profile: ~/.star/browser-profile
+  url_pattern: ""
+
+directories:
+  data: data
+  logs: logs
+  plugins: star_plugins
+
+emissary:
+  default_wait_timeout: 60
+  response_poll_interval: 1.0
+
+logging:
+  rotation: 100 MB
+  retention: 30 days
+  compression: zip
+
+ocr:
+  # 默认关闭。开启需额外安装 paddleocr / opencv-python（见 requirements.txt 注释）
+  enabled: false
+  lang: ch
+  use_gpu: false
+  min_confidence: 0.5
+  det_limit_side_len: 960
+  change_threshold: 0.01
+  use_incremental: true
+
+websocket:
+  heartbeat_interval: 15
+  max_clients_per_star: 10
+  ocr_broadcast_interval: 3

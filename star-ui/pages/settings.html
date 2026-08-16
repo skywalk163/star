@@ -183,6 +183,44 @@
 
           <div class="max-w-4xl mx-auto">
 
+            <!-- API Key（浏览器本地保存，不随下面的配置表单提交） -->
+            <div class="rounded-lg border p-6 space-y-5 mb-6" style="background:var(--color-bg-card);border-color:var(--color-border);">
+              <div class="flex items-center gap-3 pb-3 border-b" style="border-color:var(--color-border);">
+                <div class="flex items-center justify-center w-10 h-10 rounded-lg" style="background:var(--color-primary-dim);">
+                  <i data-lucide="key-round" class="w-5 h-5" style="color:#ffd700;"></i>
+                </div>
+                <div class="flex-1">
+                  <h2 class="text-base font-semibold" style="color:var(--color-text-primary);">API Key</h2>
+                  <p class="text-xs" style="color:var(--color-text-muted);">保存在这台浏览器本地，所有页面共用</p>
+                </div>
+                <span id="apikey-badge" class="px-2 py-1 text-xs rounded-md" style="background:var(--color-bg-panel);color:var(--color-text-muted);">检查中…</span>
+              </div>
+
+              <div class="space-y-2">
+                <label class="text-sm font-medium" for="apikey-input" style="color:var(--color-text-secondary);">管理员 Key</label>
+                <div class="flex items-center gap-2">
+                  <input type="password" id="apikey-input" autocomplete="off"
+                         class="flex-1 px-3 py-2 text-sm rounded-lg border focus:outline-none transition-colors duration-200"
+                         style="background:var(--color-bg-panel);border-color:var(--color-border);color:var(--color-text-primary);"
+                         placeholder="粘贴 config.yaml 里 auth.api_keys 的 key">
+                  <button type="button" id="btn-apikey-reveal"
+                          class="px-3 py-2 text-sm rounded-lg border transition-colors duration-200"
+                          style="background:transparent;border-color:var(--color-border);color:var(--color-text-secondary);"
+                          aria-label="显示或隐藏 API Key">显示</button>
+                  <button type="button" id="btn-apikey-save"
+                          class="px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 hover:brightness-110"
+                          style="background:var(--color-primary);color:var(--color-bg-deep);">保存</button>
+                  <button type="button" id="btn-apikey-clear"
+                          class="px-3 py-2 text-sm rounded-lg border transition-colors duration-200"
+                          style="background:transparent;border-color:var(--color-border);color:var(--color-text-secondary);">清除</button>
+                </div>
+                <p class="text-xs" style="color:var(--color-text-muted);">
+                  首次启动时服务端会生成一份随机 Key 并打印在控制台，也可以在项目根目录的
+                  <code>config.yaml</code> → <code>auth.api_keys</code> 里查看。改完 Key 需要重启服务。
+                </p>
+              </div>
+            </div>
+
             <!-- Tab Navigation -->
             <div class="flex border-b mb-6 overflow-x-auto no-scrollbar" style="border-color:var(--color-border);">
               <button class="settings-tab flex items-center gap-2 px-4 py-3 text-sm font-medium whitespace-nowrap transition-colors duration-200" data-tab="server" style="color:#ffd700;border-bottom:2px solid #ffd700;">
@@ -658,11 +696,12 @@
           lucide.createIcons();
         } catch (e) {
           console.error('Failed to load config:', e);
+          const isAuth = e.status === 401 || e.status === 403;
           loading.innerHTML = `
             <div class="text-center">
               <i data-lucide="alert-circle" class="w-8 h-8 mx-auto mb-2" style="color:var(--state-error);"></i>
-              <p style="color:var(--state-error);">加载配置失败</p>
-              <p class="text-xs mt-1" style="color:var(--color-text-muted);">${escapeHtml(e.message)}</p>
+              <p style="color:var(--state-error);">${isAuth ? '需要 API Key 才能读取配置' : '加载配置失败'}</p>
+              <p class="text-xs mt-1" style="color:var(--color-text-muted);">${isAuth ? '请在上方「API Key」里填入管理员 Key 后重试' : escapeHtml(e.message)}</p>
               <button type="button" onclick="loadConfig()" class="mt-4 px-4 py-2 text-sm rounded-lg border transition-colors duration-200"
                       style="background:var(--color-bg-panel);border-color:var(--color-border);color:var(--color-text-secondary);">
                 重试
@@ -704,6 +743,60 @@
         checkUnsaved();
         showNotification('已重置为原始配置', 'info');
       }
+
+      // ==================== API Key ====================
+      // Key 只存在浏览器 localStorage（由 api-bridge.js 的 setApiKey 管理），
+      // 不走 /api/config：服务端不下发也不接受 Key 的改写。
+      function refreshApiKeyPanel() {
+        const input = document.getElementById('apikey-input');
+        const badge = document.getElementById('apikey-badge');
+        const key = remoteApi.getApiKey();
+        input.value = key || '';
+        if (key) {
+          badge.textContent = '已设置';
+          badge.style.color = 'var(--state-success)';
+        } else {
+          badge.textContent = '未设置';
+          badge.style.color = 'var(--state-warning)';
+        }
+      }
+
+      async function saveApiKeyFromPanel() {
+        const key = document.getElementById('apikey-input').value.trim();
+        if (!key) {
+          showNotification('请先填入 API Key', 'error');
+          return;
+        }
+        remoteApi.setApiKey(key);
+        refreshApiKeyPanel();
+        // 立刻用新 Key 拉一次配置，验证它是否有效
+        try {
+          await configApi.get();
+          showNotification('API Key 已保存并验证通过', 'success');
+          loadConfig();
+        } catch (e) {
+          showNotification(`Key 已保存，但服务端拒绝了它：${e.message}`, 'error');
+        }
+      }
+
+      function clearApiKeyFromPanel() {
+        remoteApi.setApiKey('');
+        refreshApiKeyPanel();
+        showNotification('已清除本机保存的 API Key', 'info');
+      }
+
+      document.getElementById('btn-apikey-save').addEventListener('click', saveApiKeyFromPanel);
+      document.getElementById('btn-apikey-clear').addEventListener('click', clearApiKeyFromPanel);
+      document.getElementById('btn-apikey-reveal').addEventListener('click', (ev) => {
+        const input = document.getElementById('apikey-input');
+        const hidden = input.type === 'password';
+        input.type = hidden ? 'text' : 'password';
+        ev.currentTarget.textContent = hidden ? '隐藏' : '显示';
+      });
+      document.getElementById('apikey-input').addEventListener('keydown', (ev) => {
+        if (ev.key === 'Enter') saveApiKeyFromPanel();
+      });
+      refreshApiKeyPanel();
 
       document.querySelectorAll('.settings-tab').forEach(btn => {
         btn.addEventListener('click', () => switchTab(btn.dataset.tab));

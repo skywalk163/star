@@ -6,6 +6,7 @@
 
 import asyncio
 import os
+import secrets
 import sys
 import time
 from contextlib import asynccontextmanager
@@ -49,14 +50,74 @@ except ImportError as exc:
 
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _CONFIG_PATH = os.path.join(_PROJECT_ROOT, "config.yaml")
+_CONFIG_EXAMPLE_PATH = os.path.join(_PROJECT_ROOT, "config.example.yaml")
+
+# config.example.yaml 里写死的占位 Key。这些值随仓库公开，任何人都知道，
+# 因此首次生成 config.yaml 时会替换成随机值，若用户手动填回则启动时告警。
+_PLACEHOLDER_KEYS = {"star-admin-key", "star-viewer-key", "CHANGE-ME"}
+
+
+def _bootstrap_config() -> None:
+    """首次运行：从 config.example.yaml 生成 config.yaml，并分配随机 API Key。
+
+    config.yaml 不入库（见 .gitignore），所以每台机器的 Key 都是本机独有的，
+    用户不需要手动改配置就能拿到一份安全的默认设置。
+    """
+    if os.path.exists(_CONFIG_PATH) or not os.path.exists(_CONFIG_EXAMPLE_PATH):
+        return
+
+    with open(_CONFIG_EXAMPLE_PATH, "r", encoding="utf-8") as f:
+        cfg = yaml.safe_load(f) or {}
+
+    generated = []
+    for key_info in cfg.get("auth", {}).get("api_keys", []) or []:
+        role = key_info.get("role", "viewer")
+        key_info["key"] = f"star-{role}-{secrets.token_urlsafe(24)}"
+        generated.append((key_info.get("name", role), key_info["key"]))
+
+    with open(_CONFIG_PATH, "w", encoding="utf-8") as f:
+        yaml.dump(cfg, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
+
+    sys.stderr.write(f"\n[群星 Star] 首次运行，已生成 {_CONFIG_PATH}，并为你分配了独立的 API Key：\n")
+    for name, key in generated:
+        sys.stderr.write(f"    {name}: {key}\n")
+    sys.stderr.write("  这些 Key 也可以随时在 config.yaml 里查看或修改。\n")
+    sys.stderr.write("  在 Web 界面「设置 → API Key」里粘贴管理员 Key 即可开始使用。\n\n")
 
 
 def load_config() -> dict:
-    """加载 YAML 配置文件"""
+    """加载 YAML 配置文件（首次运行会自动从模板生成）"""
+    _bootstrap_config()
     if os.path.exists(_CONFIG_PATH):
         with open(_CONFIG_PATH, "r", encoding="utf-8") as f:
             return yaml.safe_load(f) or {}
     return {}
+
+
+def warn_insecure_defaults(config: dict) -> None:
+    """对会把本机键鼠/截屏能力暴露出去的配置发出告警"""
+    auth_cfg = config.get("auth", {}) or {}
+
+    if not auth_cfg.get("enabled", False):
+        logger.warning("⚠️ 认证未启用：任何能访问本服务的人都能操控你的 AI 软件和键鼠")
+    else:
+        weak = [
+            k.get("name") or k.get("role", "?")
+            for k in (auth_cfg.get("api_keys") or [])
+            if k.get("key") in _PLACEHOLDER_KEYS
+        ]
+        if weak:
+            logger.warning(
+                f"⚠️ 仍在使用示例配置里的公开占位 API Key（{'、'.join(weak)}），"
+                "请修改 config.yaml 的 auth.api_keys 后重启"
+            )
+
+    host = config.get("server", {}).get("host", "127.0.0.1")
+    if host not in ("127.0.0.1", "localhost", "::1"):
+        logger.warning(
+            f"⚠️ 监听地址为 {host}，远程键鼠与截屏能力会暴露到局域网，请仅在可信网络下这样配置"
+        )
+
 
 
 def setup_logging(config: dict):
@@ -105,6 +166,7 @@ def setup_logging(config: dict):
 
 _config = load_config()
 setup_logging(_config)
+warn_insecure_defaults(_config)
 
 # 保存到全局 state
 state.config = _config

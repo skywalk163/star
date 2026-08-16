@@ -37,6 +37,9 @@ Thumbs.db
 .env
 .env.local
 
+# 本机配置（含本机独有的 API Key，首次启动由 config.example.yaml 自动生成）
+config.yaml
+
 # 临时文件
 tmp/
 temp/
