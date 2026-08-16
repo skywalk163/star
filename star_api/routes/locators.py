@@ -18,6 +18,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from star_api import state
+from star_core.uia_executor import run_uia_async
 
 router = APIRouter()
 
@@ -367,32 +368,37 @@ def _ratio_fallback_click(ratio_params: dict, hwnd: int) -> Optional[dict]:
 
 # ==================== 路由 ====================
 
+def _build_candidates() -> list[dict]:
+    """构造候选列表（含 UIA 探测）。必须在 UIA 专用线程上执行。"""
+    candidates = []
+    for s in _get_stars():
+        hwnd = s.hwnd if hasattr(s, "hwnd") else 0
+        candidates.append({
+            "star_id": str(s.pid),
+            "star_type": s.star_type,
+            "title": s.title,
+            "pid": s.pid,
+            "capabilities": {
+                "uia": _probe_uia_capability(hwnd) if hwnd else False,
+                "visual": _probe_visual_capability(),
+                "cdp": _probe_cdp_capability(s),
+            },
+        })
+    return candidates
+
+
 @router.get("/candidates")
 async def list_candidates():
     """
     列出当前已发现的 agent 及其可用定位能力。
     capabilities 探测：uia=有 hwnd 且能取到控件树；visual=OCR 可用；cdp=browser 配置或 cdptab 存在。
+
+    UIA 走 COM，必须串行且不能在事件循环线程上执行，否则会导致进程级原生崩溃。
     """
-    try:
-        stars = _get_stars()
-        candidates = []
-        for s in stars:
-            hwnd = s.hwnd if hasattr(s, "hwnd") else 0
-            caps = {
-                "uia": _probe_uia_capability(hwnd) if hwnd else False,
-                "visual": _probe_visual_capability(),
-                "cdp": _probe_cdp_capability(s),
-            }
-            candidates.append({
-                "star_id": str(s.pid),
-                "star_type": s.star_type,
-                "title": s.title,
-                "pid": s.pid,
-                "capabilities": caps,
-            })
-        return {"candidates": candidates}
-    except Exception as e:
-        return {"ok": False, "error": str(e), "candidates": []}
+    candidates = await run_uia_async(_build_candidates, default=None)
+    if candidates is None:
+        return {"ok": False, "error": "UIA 探测超时或失败", "candidates": []}
+    return {"candidates": candidates}
 
 
 @router.get("/{star_id}/inspect")
@@ -410,12 +416,14 @@ async def inspect_star(star_id: str):
         raise HTTPException(status_code=400, detail="star has no hwnd")
 
     try:
-        screenshot_b64 = _capture_screenshot_b64(hwnd)
+        screenshot_b64 = await run_uia_async(_capture_screenshot_b64, hwnd, default=None)
         if not screenshot_b64:
             return {"ok": False, "error": "screenshot capture failed",
                     "screenshot_b64": "", "uia_tree": [], "truncated": False}
 
-        uia_tree, truncated = _walk_uia_tree(hwnd, max_nodes=80)
+        uia_tree, truncated = await run_uia_async(
+            _walk_uia_tree, hwnd, max_nodes=80, default=([], False)
+        )
 
         return {
             "ok": True,
@@ -426,6 +434,31 @@ async def inspect_star(star_id: str):
     except Exception as e:
         return {"ok": False, "error": str(e),
                 "screenshot_b64": "", "uia_tree": [], "truncated": False}
+
+
+def _probe_sync(hwnd: int, star, params: dict, prompt: str) -> dict:
+    """定位 + 点击注入。含 UIA/SendInput，必须在 UIA 专用线程上执行。"""
+    target = _build_locator_target(params)
+    loc_result = None
+
+    if target is not None:
+        loc_result = _try_locate(target, hwnd, star)
+
+    # locators 不可用时用 ratio 兜底
+    if loc_result is None and params.get("ratio"):
+        loc_result = _ratio_fallback_click(params["ratio"], hwnd)
+
+    if loc_result is None:
+        return {"hit": False, "source": "", "box": {},
+                "error": "no locator hit (locators package may not be ready)"}
+
+    box = loc_result["box"]
+    ok, err = _click_and_inject(hwnd, box["x"], box["y"], prompt)
+    if not ok:
+        return {"hit": False, "source": loc_result["source"],
+                "box": box, "error": f"inject failed: {err}"}
+
+    return {"hit": True, "source": loc_result["source"], "box": box, "error": ""}
 
 
 @router.post("/{star_id}/probe")
@@ -442,40 +475,12 @@ async def probe_star(star_id: str, request: ProbeRequest):
     if not hwnd:
         raise HTTPException(status_code=400, detail="star has no hwnd")
 
-    try:
-        # 尝试用 locators 链定位
-        target = _build_locator_target(request.params)
-        loc_result = None
-
-        if target is not None:
-            loc_result = _try_locate(target, hwnd, star)
-
-        # locators 不可用时用 ratio 兜底
-        if loc_result is None and request.params.get("ratio"):
-            loc_result = _ratio_fallback_click(request.params["ratio"], hwnd)
-
-        if loc_result is None:
-            return {"hit": False, "source": "", "box": {},
-                    "error": "no locator hit (locators package may not be ready)"}
-
-        box = loc_result["box"]
-        abs_x = box["x"]
-        abs_y = box["y"]
-
-        # 点击并注入
-        ok, err = _click_and_inject(hwnd, abs_x, abs_y, request.prompt)
-        if not ok:
-            return {"hit": False, "source": loc_result["source"],
-                    "box": box, "error": f"inject failed: {err}"}
-
-        return {
-            "hit": True,
-            "source": loc_result["source"],
-            "box": box,
-            "error": "",
-        }
-    except Exception as e:
-        return {"hit": False, "source": "", "box": {}, "error": str(e)}
+    result = await run_uia_async(
+        _probe_sync, hwnd, star, request.params, request.prompt, default=None
+    )
+    if result is None:
+        return {"hit": False, "source": "", "box": {}, "error": "UIA 探测超时或失败"}
+    return result
 
 
 @router.post("/preview")
