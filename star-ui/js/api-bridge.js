@@ -410,6 +410,10 @@ const remoteApi = {
   calibrateAndApply: (hwnd, starType = 'trae') =>
     apiFetch('/api/remote/calibrate/' + hwnd + '/apply?star_type=' + starType, { method: 'POST' }),
 
+  // 星群状态（/api/remote/* 需要 X-API-Key，必须走 apiFetch 而非裸 fetch）
+  getStarsStatus: () => apiFetch('/api/remote/stars/status'),
+  getStarsBrief: () => apiFetch('/api/remote/stars/brief'),
+
   // 认证
   getAuthStatus: () => apiFetch('/api/remote/auth/status'),
   setApiKey: setApiKey,

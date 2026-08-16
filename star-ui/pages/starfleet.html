@@ -489,8 +489,8 @@
         // Fetch stars status
         async function fetchStarsStatus() {
             try {
-                const resp = await fetch('/api/remote/stars/status');
-                const data = await resp.json();
+                // 经 remoteApi 走 apiFetch，自动附带 X-API-Key（若已在遥控台设置）
+                const data = await remoteApi.getStarsStatus();
 
                 if (data.success) {
                     lastData = data;
@@ -504,10 +504,11 @@
                 }
             } catch (err) {
                 console.error('Failed to fetch stars status:', err);
+                const needKey = String(err.message || '').startsWith('401');
                 document.getElementById('starsGrid').innerHTML = `
                     <div class="empty-state">
                         <div class="icon"><i data-icon="alert-circle"></i></div>
-                        <div class="text">无法连接到服务器</div>
+                        <div class="text">${needKey ? '需要在“遥控台”页面设置 API Key 后才能查看星群状态' : '无法连接到服务器'}</div>
                     </div>
                 `;
                 if (typeof lucide !== 'undefined') lucide.createIcons();
@@ -638,9 +639,8 @@
         async function focusWindow(hwnd) {
             if (!hwnd) return;
             try {
-                await fetch(`/api/remote/click/${hwnd}?x_ratio=0.5&y_ratio=0.5`, {
-                    method: 'POST'
-                });
+                // 走 remoteApi 以携带 X-API-Key，否则 auth 开启时必然 401
+                await remoteApi.clickWindow(hwnd, 0.5, 0.5);
             } catch (err) {
                 console.error('Failed to focus window:', err);
             }

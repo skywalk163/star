@@ -282,18 +282,22 @@ class LogReader:
                 if file_size == 0:
                     continue
                 
-                with open(file_path, "r", encoding="utf-8", errors="replace") as f:
-                    # 跳过开头（如果文件很大，只读末尾）
-                    lines = []
-                    if file_size > 1024 * 1024:  # > 1MB
-                        f.seek(-min(file_size, 50 * 1024), os.SEEK_END)  # 读末尾 50KB
-                        f.readline()  # 跳过可能的截断行
-                    
-                    for line in f:
-                        lines.append(line)
-                        if len(lines) > max_lines:
-                            lines.pop(0)
-                
+                # 大文件只读末尾 50KB：文本模式不支持 end-relative seek，
+                # 故以二进制定位后再解码。
+                if file_size > 1024 * 1024:  # > 1MB
+                    with open(file_path, "rb") as fb:
+                        fb.seek(-min(file_size, 50 * 1024), os.SEEK_END)
+                        raw = fb.read()
+                    text = raw.decode("utf-8", errors="replace")
+                    raw_lines = text.splitlines(keepends=True)
+                    if raw_lines:
+                        raw_lines.pop(0)  # 丢弃可能被截断的首行
+                else:
+                    with open(file_path, encoding="utf-8", errors="replace") as f:
+                        raw_lines = f.readlines()
+
+                lines = raw_lines[-max_lines:] if max_lines else raw_lines
+
                 # 解析每一行
                 for i, line in enumerate(lines):
                     entry = LogEntry(

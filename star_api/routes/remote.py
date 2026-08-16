@@ -5,6 +5,7 @@
 """
 
 import os
+from datetime import datetime
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import FileResponse
 from star_api import state
@@ -641,7 +642,7 @@ async def get_broadcast_status(hwnd: int):
 
 # ==================== 配置管理 ====================
 
-@router.get("/config/agents")
+@router.get("/config/agents", dependencies=[Depends(require_read)])
 async def list_agent_configs():
     """获取所有 Agent 配置"""
     from star_core.config_service import get_config_service
@@ -663,7 +664,7 @@ async def list_agent_configs():
     }
 
 
-@router.get("/config/agents/{agent_id}")
+@router.get("/config/agents/{agent_id}", dependencies=[Depends(require_read)])
 async def get_agent_config(agent_id: str):
     """获取指定 Agent 的完整配置"""
     from star_core.config_service import get_config_service
@@ -675,7 +676,7 @@ async def get_agent_config(agent_id: str):
     return {"agent": agent}
 
 
-@router.post("/config/reload")
+@router.post("/config/reload", dependencies=[Depends(require_control)])
 async def reload_config():
     """强制重新加载配置"""
     from star_core.config_service import get_config_service
@@ -686,7 +687,7 @@ async def reload_config():
 
 # ==================== 任务历史 ====================
 
-@router.get("/tasks")
+@router.get("/tasks", dependencies=[Depends(require_read)])
 async def list_tasks(status: str = None, limit: int = 100, offset: int = 0):
     """获取任务历史列表"""
     from star_core.database import get_db_service
@@ -695,7 +696,7 @@ async def list_tasks(status: str = None, limit: int = 100, offset: int = 0):
     return {"tasks": tasks, "total": total}
 
 
-@router.get("/tasks/{task_id}")
+@router.get("/tasks/{task_id}", dependencies=[Depends(require_read)])
 async def get_task(task_id: str):
     """获取单个任务详情"""
     from star_core.database import get_db_service
@@ -706,7 +707,7 @@ async def get_task(task_id: str):
     return {"task": task}
 
 
-@router.post("/tasks")
+@router.post("/tasks", dependencies=[Depends(require_write)])
 async def upsert_task(task_data: dict):
     """创建或更新任务"""
     from star_core.database import get_db_service
@@ -716,7 +717,7 @@ async def upsert_task(task_data: dict):
     return {"success": True, "task_id": task_id}
 
 
-@router.delete("/tasks/{task_id}")
+@router.delete("/tasks/{task_id}", dependencies=[Depends(require_write)])
 async def delete_task(task_id: str):
     """删除任务"""
     from star_core.database import get_db_service

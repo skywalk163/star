@@ -13,15 +13,30 @@ import time
 from typing import Optional, Callable, Any
 from dataclasses import dataclass
 
-import win32gui
-import win32process
-import win32con
-import win32api
-import win32ui
+try:
+    import win32gui
+    import win32process
+    import win32con
+    import win32api
+    import win32ui
+    _win32_available = True
+except ImportError:
+    _win32_available = False
+    win32gui = None
+    win32process = None
+    win32con = None
+    win32api = None
+    win32ui = None
+
 from ctypes import windll, Structure, c_long, byref
 from ctypes.wintypes import POINT
 
-import psutil
+try:
+    import psutil
+    _psutil_available = True
+except ImportError:
+    _psutil_available = False
+    psutil = None
 
 
 @dataclass

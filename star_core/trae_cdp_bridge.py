@@ -82,58 +82,80 @@ _CHECK_INPUT_JS = """
 """
 
 #: JS：读取最新 AI 响应
+#:
+#: Trae 的真实类名约定是 `chat-input-v2-*` / `messageInput*` / `initial-chat-panel`，
+#: 通用的 `.chat-message` / `.markdown-body` / `[data-role=assistant]` 在 Trae 里
+#: 命中数恒为 0。历史实现在全部选择器失配后会退化为"全文档取最大文本块"，
+#: 结果把菜单栏、侧栏任务列表、会员广告一起当成 AI 回复返回。
+#:
+#: 现在的策略：所有查找都限定在聊天面板容器内，绝不扫描整个 document；
+#: 找不到就诚实返回空串，由调用方决定如何处理。
 _READ_LATEST_RESPONSE_JS = """
 (() => {
-    // 策略1: 查找聊天消息容器中的最后一条助手消息
-    const selectors = [
-        '.chat-message:last-child .markdown-body',
-        '.chat-message:last-child .message-content',
-        '[data-role="assistant"]:last-child',
-        '.message-list .message:last-child',
-        '.chat-content .message:last-child',
-        '.conversation .message:last-child',
-        '.chat-message-list .chat-message-item:last-child',
-        '.chat-message-list .message-item:last-child',
+    // 初始面板 = 尚未开始对话，此时面板里只有欢迎文案，不存在 AI 回复
+    if (document.querySelector('.initial-chat-panel, [class*="initial-chat-panel"]')) {
+        return {text: '', via: 'empty_panel'};
+    }
+
+    // 定位聊天面板根容器
+    const rootSelectors = [
+        '[class*="chat-panel"]',
+        '[class*="conversation"]',
+        '[class*="messageList"]',
+        '[class*="message-list"]',
     ];
-    for (const sel of selectors) {
+    let root = null;
+    for (const sel of rootSelectors) {
         const el = document.querySelector(sel);
-        if (el && el.innerText && el.innerText.trim().length > 0) {
-            return {text: el.innerText.trim().slice(0, 8000), via: sel};
+        if (el) { root = el; break; }
+    }
+    // 兜底：从输入框往上找一个足够大的祖先当作聊天区
+    if (!root) {
+        const input = document.querySelector('[class*="chat-input-v2-container"], [class*="messageInputContainer"]');
+        let node = input ? input.parentElement : null;
+        while (node && node !== document.body) {
+            const r = node.getBoundingClientRect();
+            if (r.width > 200 && r.height > 200) { root = node; break; }
+            node = node.parentElement;
+        }
+    }
+    if (!root) return {text: '', via: 'no_chat_panel'};
+
+    // 输入区/工具栏不是回复内容，需要排除
+    const isChrome = (el) => !!el.closest(
+        '[class*="chat-input-v2"], [class*="messageInput"], [class*="Toolbar"], [class*="toolbar"]'
+    );
+
+    // 策略1: 面板内的消息/markdown 容器，取最后一个
+    const msgSelectors = [
+        '[class*="markdown"]',
+        '[class*="messageContent"]',
+        '[class*="message-content"]',
+        '[class*="messageItem"]',
+        '[class*="message-item"]',
+        '[data-role="assistant"]',
+    ];
+    for (const sel of msgSelectors) {
+        const els = Array.from(root.querySelectorAll(sel)).filter(e => !isChrome(e));
+        for (let i = els.length - 1; i >= 0; i--) {
+            const t = (els[i].innerText || '').trim();
+            if (t.length > 0) return {text: t.slice(0, 8000), via: sel};
         }
     }
 
-    // 策略2: 查找所有包含 markdown-body 的元素，取最后一个可见的
-    const markdownEls = document.querySelectorAll('.markdown-body, .markdown-renderer, [class*="message-content"]');
-    for (let i = markdownEls.length - 1; i >= 0; i--) {
-        const el = markdownEls[i];
-        const rect = el.getBoundingClientRect();
-        if (rect.width > 100 && rect.height > 20) {
-            const text = el.innerText || '';
-            if (text.trim().length > 10) {
-                return {text: text.trim().slice(0, 8000), via: 'markdown_scan'};
-            }
-        }
-    }
-
-    // 策略3: 在页面上半部分查找包含大段文本的元素
-    const candidates = document.querySelectorAll('div, article, section');
+    // 策略2: 面板内可见的最大文本块（严格限定在 root 内，排除输入区）
     let best = '';
-    for (const el of candidates) {
-        const rect = el.getBoundingClientRect();
-        if (rect.bottom > 50 && rect.top < window.innerHeight * 0.7 &&
-            rect.width > 200 && rect.height > 50) {
-            const text = el.innerText || '';
-            if (text.length > best.length && text.length < 15000) {
-                if (el.children.length < 80) {
-                    best = text;
-                }
-            }
-        }
+    for (const el of root.querySelectorAll('div, article, section, p')) {
+        if (isChrome(el)) continue;
+        const r = el.getBoundingClientRect();
+        if (r.width < 200 || r.height < 30) continue;
+        if (el.children.length >= 80) continue;
+        const t = (el.innerText || '').trim();
+        if (t.length > best.length && t.length < 15000) best = t;
     }
-    if (best) {
-        return {text: best.slice(0, 8000), via: 'scan'};
-    }
+    if (best) return {text: best.slice(0, 8000), via: 'panel_scan'};
 
+    // 没有可读回复时诚实返回空，不要拿 UI 文本冒充 AI 输出
     return {text: '', via: 'none'};
 })()
 """

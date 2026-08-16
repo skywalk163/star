@@ -93,6 +93,40 @@ async def list_star_types():
     return state.orbit_engine.star_seeker.list_star_types()
 
 
+@router.get("/idle")
+async def get_idle_stars(star_type: Optional[str] = None):
+    """
+    获取空闲星体
+
+    Args:
+        star_type: 星体类型过滤
+
+    Returns:
+        空闲星体列表
+
+    注意：必须注册在 /{pid} 之前，否则 "idle" 会被当作 pid 解析而返回 422。
+    """
+    if state.orbit_engine is None:
+        raise HTTPException(status_code=503, detail="星核未初始化")
+
+    if star_type:
+        stars = state.orbit_engine.star_seeker.get_idle_stars(star_type)
+    else:
+        stars = state.orbit_engine.star_seeker.get_idle_stars()
+
+    return {
+        "stars": [
+            {
+                "pid": s.pid,
+                "star_type": s.star_type,
+                "title": s.title
+            }
+            for s in stars
+        ],
+        "total": len(stars)
+    }
+
+
 @router.get("/{pid}")
 async def get_star(pid: int):
     """
@@ -151,38 +185,6 @@ async def refresh_star(pid: int):
         "last_activity": star.last_activity,
         "window_count": star.get_window_count(),
         "windows": [w.to_dict() for w in star.windows],
-    }
-
-
-@router.get("/idle")
-async def get_idle_stars(star_type: Optional[str] = None):
-    """
-    获取空闲星体
-    
-    Args:
-        star_type: 星体类型过滤
-        
-    Returns:
-        空闲星体列表
-    """
-    if state.orbit_engine is None:
-        raise HTTPException(status_code=503, detail="星核未初始化")
-    
-    if star_type:
-        stars = state.orbit_engine.star_seeker.get_idle_stars(star_type)
-    else:
-        stars = state.orbit_engine.star_seeker.get_idle_stars()
-    
-    return {
-        "stars": [
-            {
-                "pid": s.pid,
-                "star_type": s.star_type,
-                "title": s.title
-            }
-            for s in stars
-        ],
-        "total": len(stars)
     }
 
 
