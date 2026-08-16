@@ -17,7 +17,7 @@ from typing import Optional
 try:
     import yaml
 
-    from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
+    from fastapi import Depends, FastAPI, Request, WebSocket, WebSocketDisconnect
     from fastapi.middleware.cors import CORSMiddleware
     from fastapi.staticfiles import StaticFiles
     from fastapi.responses import FileResponse
@@ -282,9 +282,16 @@ app = FastAPI(
 )
 
 # CORS 配置
+# 只放行本机同源。此前用 allow_origins=["*"] + allow_credentials=True，
+# 会让用户浏览器里任意网页都能带凭据打到 127.0.0.1:8765，把任务注入本机 AI 软件。
+_cors_port = _server_cfg.get("port", 8765)
+_allowed_origins = [
+    f"http://127.0.0.1:{_cors_port}",
+    f"http://localhost:{_cors_port}",
+]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -641,18 +648,35 @@ from star_api.routes.observability import router as observability_router
 from star_api.routes.locators import router as locators_router
 from star_api.routes.dumate import router as dumate_router
 
-app.include_router(stars_router, prefix="/api/stars", tags=["星体"])
-app.include_router(novas_router, prefix="/api/novas", tags=["新星"])
-app.include_router(constellations_router, prefix="/api/constellations", tags=["星座"])
-app.include_router(history_router, prefix="/api/history", tags=["历史与统计"])
-app.include_router(plugins_router, prefix="/api/plugins", tags=["插件管理"])
-app.include_router(emissary_router, prefix="/api/emissary", tags=["星使交互"])
-app.include_router(config_router)
-app.include_router(work_router)
-app.include_router(remote_router, prefix="/api/remote", tags=["远程控制"])
-app.include_router(observability_router, prefix="/api/observability", tags=["可观测性"])
-app.include_router(locators_router, prefix="/api/locators", tags=["定位器校准"])
-app.include_router(dumate_router)
+from star_api.auth import require_by_method
+
+
+def _include_guarded(router, write_permission: str, **kwargs) -> None:
+    """挂载 router 并强制附加鉴权依赖。
+
+    所有 /api 下的 router 都必须走这里，不要直接 app.include_router：
+    这样「新增接口默认要鉴权」是结构上的保证，而不是靠记性。
+    读请求需 read，写请求需 write_permission（见 auth.require_by_method）。
+    """
+    deps = list(kwargs.pop("dependencies", []))
+    deps.append(Depends(require_by_method(write_permission)))
+    app.include_router(router, dependencies=deps, **kwargs)
+
+
+# write_permission 按各 router 能造成的实际影响分级：
+#   control = 能操作本机 AI 软件 / 键鼠 / 截屏   admin = 能改服务自身行为
+_include_guarded(stars_router, "control", prefix="/api/stars", tags=["星体"])
+_include_guarded(novas_router, "write", prefix="/api/novas", tags=["新星"])
+_include_guarded(constellations_router, "write", prefix="/api/constellations", tags=["星座"])
+_include_guarded(history_router, "write", prefix="/api/history", tags=["历史与统计"])
+_include_guarded(plugins_router, "admin", prefix="/api/plugins", tags=["插件管理"])
+_include_guarded(emissary_router, "control", prefix="/api/emissary", tags=["星使交互"])
+_include_guarded(config_router, "admin")
+_include_guarded(work_router, "control")
+_include_guarded(remote_router, "control", prefix="/api/remote", tags=["远程控制"])
+_include_guarded(observability_router, "admin", prefix="/api/observability", tags=["可观测性"])
+_include_guarded(locators_router, "write", prefix="/api/locators", tags=["定位器校准"])
+_include_guarded(dumate_router, "control")
 
 
 # ==================== 静态文件 & 控制面板 ====================
