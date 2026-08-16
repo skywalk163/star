@@ -49,7 +49,12 @@ import subprocess
 import time
 from typing import List, Optional, Tuple
 
-from star_core.trae_launcher import is_cdp_alive, list_targets, wait_for_cdp
+from star_core.trae_launcher import (
+    clean_launch_env,
+    is_cdp_alive,
+    list_targets,
+    wait_for_cdp,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -109,17 +114,6 @@ def find_dumate_app_exe() -> Optional[str]:
             return path
     found = shutil.which("DuMate.exe")
     return found or None
-
-
-def _clean_launch_env() -> dict:
-    """返回剔除所有 ``ELECTRON_*`` 后的环境变量副本。
-
-    调用方若身处 Electron 宿主的集成终端，环境里会有
-    ``ELECTRON_RUN_AS_NODE=1``；被 DuMate.exe 继承后它会当纯 Node 跑，
-    导致"启动即退出"（详见模块 docstring）。
-    """
-    return {k: v for k, v in os.environ.items() if not k.upper().startswith("ELECTRON")}
-
 
 
 def _iter_dumate_procs():
@@ -287,7 +281,7 @@ def launch_dumate_app_with_cdp(
     try:
         subprocess.Popen(
             args,
-            env=_clean_launch_env(),
+            env=clean_launch_env(),
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             creationflags=subprocess.DETACHED_PROCESS if os.name == "nt" else 0,

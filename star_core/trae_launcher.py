@@ -5,18 +5,28 @@ Trae 启动器（trae_launcher）- 自动以 CDP 调试端口拉起 Trae Work
 可复用函数，供 TraeWorkAdapter.connect() 在 CDP 端口不可达时自动拉起
 Trae，让"连接 Trae"像连接 DuMate 一样一键完成。
 
-== 如何绕过 Trae 的 CLI 严格解析（已实测 + 静态确认）==================
-Trae 0.1.50 的 exe 是 VS Code 的 ``code`` CLI 分支：
-  - 传 ``--remote-debugging-port=9223`` → 报 ``bad option`` 并立即退出；
-  - 传位置参数（如路径）→ 被当成 node 模块 ``require``，报
-    ``Cannot find module``。
-即**命令行永远无法把 CDP 端口传给 Trae**。
+== 启动必须清理 ELECTRON_* 环境变量（2026-08-16 定位）=================
+Star 可能被 Electron 宿主（如 Comate / VS Code 的集成终端）拉起，环境中
+带 ``ELECTRON_RUN_AS_NODE=1``。子进程继承后，``TRAE SOLO CN.exe``
+**退化为纯 Node 解释器**（实测 ``process.versions.node = 22.21.1``）：
+  - 零参数启动 → 没有脚本可跑，立即 exit 0，窗口与 CDP 都不出现；
+  - 传 ``--remote-debugging-port=9223`` → Node 报 ``bad option`` 后退出；
+  - 传位置参数（路径）→ Node 当模块 ``require``，报 ``Cannot find module``。
+三种现象与"Trae 未安装 / 拒绝调试端口 / 单实例锁残留"完全一样，极易误判。
+故 :func:`launch_trae_with_cdp` 启动前剔除所有 ``ELECTRON_*``。
 
-但 Trae 主进程（main.js）会读取 user data 目录下的 ``argv.json``，
-对其中的 ``remote-debugging-port`` 走 ``app.commandLine.appendSwitch``
-（main.js 第 1902 行附近有允许列表 + appendSwitch 逻辑，已确认）。
-因此唯一可靠做法是：把 ``remote-debugging-port`` 写进 ``argv.json``，
-再以**零参数**启动 Trae，由主进程把它附加到 electron 命令行。
+.. warning::
+   本模块早期注释把上面第 2、3 条当成"Trae 的 code CLI 严格解析拒绝调试
+   端口"，并据此断言"命令行永远无法把 CDP 端口传给 Trae"。那两条报错实际
+   来自 **Node 而非 Trae**（当时环境被 ``ELECTRON_RUN_AS_NODE`` 污染），
+   该断言未在干净环境下验证过，不应再作为设计依据。
+
+== 为什么用 argv.json 传 CDP 端口 ====================================
+Trae 主进程（main.js）读取 user data 目录下的 ``argv.json``，对其中的
+``remote-debugging-port`` 走 ``app.commandLine.appendSwitch``（main.js
+第 1902 行附近的允许列表 + appendSwitch 逻辑）。这条通路已实测有效：写入
+9223 后由用户正常启动 Trae，``DevToolsActivePort`` 落地 9223 且端口可连，
+故保留它作为主实现（无需依赖未验证的命令行传参）。
 
 设计要点：
 - 幂等：端口已可用 → 直接返回 True，不重复拉起。
@@ -26,6 +36,7 @@ Trae 0.1.50 的 exe 是 VS Code 的 ``code`` CLI 分支：
 - 清单实例锁：强杀 Trae 后 ``code.lock`` 可能残留，启动前清理，
   避免新实例被误判为"已在运行"而静默退出。
 - 跨平台：Windows 下用 DETACHED_PROCESS 让 Trae 脱离父进程独立运行。
+- 干净环境：启动前剔除 ``ELECTRON_*``，见上文说明。
 """
 
 from __future__ import annotations
@@ -68,6 +79,16 @@ def find_trae_exe() -> Optional[str]:
         if found:
             return found
     return None
+
+
+def clean_launch_env() -> dict:
+    """返回剔除所有 ``ELECTRON_*`` 后的环境变量副本，用于拉起 Electron 应用。
+
+    调用方若身处 Electron 宿主的集成终端，环境里会有
+    ``ELECTRON_RUN_AS_NODE=1``；被目标 exe 继承后它会退化成纯 Node 跑，
+    导致"启动即退出"（详见模块 docstring）。DuMate 桌面端启动器复用本函数。
+    """
+    return {k: v for k, v in os.environ.items() if not k.upper().startswith("ELECTRON")}
 
 
 def is_cdp_alive(port: int, timeout: float = 2.0) -> bool:
@@ -233,16 +254,22 @@ def _clean_trae_singleton_lock() -> None:
 
 
 def launch_trae_with_cdp(port: int = _DEFAULT_TRAE_CDP_PORT, timeout: float = 30.0) -> bool:
-    """以 CDP 调试端口启动 Trae（通过 argv.json，绕过 CLI 严格解析）。
+    """以 CDP 调试端口启动 Trae（通过 argv.json）。
 
-    Trae 0.1.50 的 code CLI 拒绝 ``--remote-debugging-port``（报 bad option），
-    且把位置参数当成 node 模块 require。唯一可靠的绕行方式是在 user data 目录
-    的 ``argv.json`` 中写入 ``remote-debugging-port``，再以**零参数**启动，由
-    Trae 主进程读取后 ``appendSwitch`` 到 electron 命令行。
+    Trae 主进程读取 user data 目录 ``argv.json`` 中的
+    ``remote-debugging-port`` 并 ``appendSwitch`` 到 electron 命令行，因此
+    做法是：把端口写进 ``argv.json`` 后以**零参数**启动 Trae。
 
     流程：
     - 端口已可用 → 直接返回 True（幂等）。
-    - 否则：确保 argv.json 含该端口 → 清理单实例锁 → 零参数拉起 → 等端口就绪。
+    - 否则：确保 argv.json 含该端口 → 清理单实例锁 → 剔除 ``ELECTRON_*`` 后
+      零参数拉起 → 等端口就绪。
+
+    .. note::
+       启动时必须用 :func:`clean_launch_env` 剔除 ``ELECTRON_*``。若 Star
+       跑在 Electron 宿主（Comate / VS Code）的集成终端里，环境中的
+       ``ELECTRON_RUN_AS_NODE=1`` 会被 Trae 继承，使其退化成纯 Node 而
+       "启动即退出"（详见模块 docstring）。
 
     Args:
         port: CDP 端口号（默认 9223）。
@@ -275,6 +302,7 @@ def launch_trae_with_cdp(port: int = _DEFAULT_TRAE_CDP_PORT, timeout: float = 30
     try:
         subprocess.Popen(
             [trae_exe],
+            env=clean_launch_env(),
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             creationflags=subprocess.DETACHED_PROCESS if os.name == "nt" else 0,
@@ -283,7 +311,24 @@ def launch_trae_with_cdp(port: int = _DEFAULT_TRAE_CDP_PORT, timeout: float = 30
         logger.warning("launch_trae_with_cdp: 启动失败: %s", e)
         return False
 
-    return wait_for_cdp(port, timeout=timeout)
+    if wait_for_cdp(port, timeout=timeout):
+        return True
+
+    # 区分两种失败：进程根本没活下来 vs 活着但端口没开，否则排障只能靠猜
+    if is_trae_running(trae_exe):
+        logger.warning(
+            "launch_trae_with_cdp: Trae 进程已存活但 %.0fs 内 CDP 端口 %d 未监听；"
+            "检查 %s 是否含 remote-debugging-port，以及是否有旧实例占用单实例锁",
+            timeout, port, get_trae_argv_json_path(),
+        )
+    else:
+        logger.warning(
+            "launch_trae_with_cdp: Trae 进程未存活（启动后即退出）。%s 已启动但没留下进程，"
+            "常见原因是环境变量 ELECTRON_RUN_AS_NODE 让它退化成纯 Node —— "
+            "本函数已剔除 ELECTRON_*，若仍如此请检查安装是否损坏",
+            trae_exe,
+        )
+    return False
 
 
 def find_running_trae_processes(exe_path: Optional[str] = None) -> List[int]:
