@@ -1061,9 +1061,15 @@
       }
     }
 
-    // ===== AI 适配器管理（统一连接入口，含 Trae Work） =====
+    // ===== AI 适配器管理（统一连接入口，含 Trae Work / DuMate 桌面端） =====
     // 显式挂到 window，便于测试/控制台探查
     window.adaptersCache = [];
+
+    // 各适配器"未连接"时的引导文案（后端 can_restart 决定是否显示重启按钮）
+    const ADAPTER_RESTART_HINTS = {
+      trae_work: ' 点"重启并连接"：Star 会关闭现有 Trae 并以调试端口重启',
+      dumate_app: ' 点"重启并连接"：Star 会关闭现有 DuMate 并以调试端口重启',
+    };
 
     async function loadAdapters() {
       try {
@@ -1088,29 +1094,30 @@
         let statusText = '离线';
         if (connected) statusText = a.status || '已连接';
         else if (alive) statusText = '可达 · 未连接';
-        const isTrae = a.ai_id === 'trae_work';
-        const hint = (!connected && isTrae)
-          ? ' 点"检测并重启 Trae"：Star 会关闭现有 Trae 并以调试端口重启'
+        // 是否给"重启并连接"入口由后端能力字段决定，不再按 ai_id 硬编码
+        const canRestart = !!a.can_restart;
+        const hint = (!connected && canRestart)
+          ? (ADAPTER_RESTART_HINTS[a.ai_id] || ' 点"重启并连接"：Star 会关闭现有实例并以调试端口重启')
           : '';
         return `
           <div class="adapter-card ${connected ? 'connected' : 'offline'}">
             <span class="kernel-dot ${connected ? 'online' : 'offline'}"></span>
             <div class="adapter-info">
               <div class="adapter-name">${escapeHtml(a.ai_name || a.ai_id)}</div>
-              <div class="adapter-status-text ${(!connected && isTrae) ? 'hint' : ''}">${escapeHtml(statusText)}${escapeHtml(hint)}</div>
+              <div class="adapter-status-text ${(!connected && canRestart) ? 'hint' : ''}">${escapeHtml(statusText)}${escapeHtml(hint)}</div>
             </div>
             ${connected
               ? `<button class="adapter-btn disconnect" onclick="disconnectAdapter('${a.ai_id}')">断开</button>`
-              : (isTrae
-                  ? `<button class="adapter-btn connect" onclick="connectAdapter('${a.ai_id}')">连接</button>
-                     <button class="adapter-btn restart" onclick="restartAdapter('${a.ai_id}')">检测并重启 Trae</button>`
-                  : `<button class="adapter-btn connect" onclick="connectAdapter('${a.ai_id}')">连接</button>`)}
+              : `<button class="adapter-btn connect" onclick="connectAdapter('${a.ai_id}')">连接</button>${
+                  canRestart
+                    ? `<button class="adapter-btn restart" onclick="restartAdapter('${a.ai_id}')">重启并连接</button>`
+                    : ''}`}
           </div>`;
       }).join('');
     }
 
     async function connectAdapter(aiId) {
-      showNotification('正在连接 ' + aiId + (aiId === 'trae_work' ? '（必要时自动启动 Trae）' : '') + '…', 'info');
+      showNotification('正在连接 ' + aiId + '…', 'info');
       try {
         const res = await adapterApi.connect(aiId);
         if (res.success) {
@@ -1132,7 +1139,12 @@
     }
 
     async function restartAdapter(aiId) {
-      showNotification('正在关闭已运行的 Trae 并以调试端口重启…', 'info');
+      const a = window.adaptersCache.find(x => x.ai_id === aiId);
+      const name = (a && (a.ai_name || a.ai_id)) || aiId;
+      if (!confirm('这会关闭正在运行的 ' + name + '（未保存的内容可能丢失），再以调试端口重启。继续？')) {
+        return;
+      }
+      showNotification('正在关闭 ' + name + ' 并以调试端口重启…', 'info');
       try {
         const res = await adapterApi.restart(aiId);
         if (res.success) {
@@ -1164,12 +1176,13 @@
       if (!sel || !hint) return;
       const a = window.adaptersCache.find(x => x.ai_id === sel.value);
       if (!a) { hint.textContent = ''; return; }
+      const target = { trae_work: 'Trae', dumate_app: 'DuMate' }[a.ai_id];
       if (a.connected) {
-        hint.textContent = a.ai_id === 'trae_work' ? '消息将发送到 Trae 窗口' : '已连接，可派发任务';
+        hint.textContent = target ? ('消息将发送到 ' + target + ' 窗口') : '已连接，可派发任务';
         hint.className = 'adapter-status-text';
       } else {
-        hint.textContent = a.ai_id === 'trae_work'
-          ? 'Trae 未连接：点上方"检测并重启 Trae"，Star 会关闭现有 Trae 并以调试端口重启'
+        hint.textContent = (target && a.can_restart)
+          ? (target + ' 未连接：点上方"重启并连接"，Star 会关闭现有 ' + target + ' 并以调试端口重启')
           : '未连接，发送将失败';
         hint.className = 'adapter-status-text hint';
       }

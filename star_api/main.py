@@ -153,23 +153,24 @@ async def lifespan(app: FastAPI):
         dumate = DuMateBridge()
         if dumate.port:
             dumate.connect()
-            logger.info("🔌 DuMate 适配器已注册 (port=%d, connected=%s)",
-                        dumate.port, dumate.connected)
+            logger.info(
+                f"🔌 DuMate 适配器已注册 (port={dumate.port}, connected={dumate.connected})"
+            )
         else:
             logger.info("🔌 DuMate 适配器已注册 (未找到内核端口)")
     except Exception as e:
-        logger.warning("🔌 DuMate 适配器注册失败: %s", e)
+        logger.warning(f"🔌 DuMate 适配器注册失败: {e}")
 
     # 注册 TraeWork 适配器
     try:
         trae = TraeWorkAdapter()
         if trae.is_alive():
             trae.connect()
-            logger.info("🔌 TraeWork 适配器已注册 (connected=%s)", trae.connected)
+            logger.info(f"🔌 TraeWork 适配器已注册 (connected={trae.connected})")
         else:
             logger.info("🔌 TraeWork 适配器已注册 (CDP 端口不可达，请以 --remote-debugging-port=9223 启动 Trae)")
     except Exception as e:
-        logger.warning("🔌 TraeWork 适配器注册失败: %s", e)
+        logger.warning(f"🔌 TraeWork 适配器注册失败: {e}")
 
     # 注册 DuMate 桌面端适配器（DuMate.exe / 百度搭子，CDP 9225）
     # 注意：只在端口已通时连接，不会为了开调试端口去重启用户正在用的 DuMate
@@ -177,20 +178,20 @@ async def lifespan(app: FastAPI):
         dumate_app = DuMateAppAdapter()
         if dumate_app.is_alive():
             dumate_app.connect()
-            logger.info("🔌 DuMate 桌面端适配器已注册 (connected=%s)", dumate_app.connected)
+            logger.info(f"🔌 DuMate 桌面端适配器已注册 (connected={dumate_app.connected})")
         else:
             logger.info(
-                "🔌 DuMate 桌面端适配器已注册 (CDP 端口 %d 不可达，"
-                "需以 --remote-debugging-port=%d 重启 DuMate)",
-                dumate_app.port, dumate_app.port,
+                f"🔌 DuMate 桌面端适配器已注册 (CDP 端口 {dumate_app.port} 不可达，"
+                f"需以 --remote-debugging-port={dumate_app.port} 重启 DuMate)"
             )
     except Exception as e:
-        logger.warning("🔌 DuMate 桌面端适配器注册失败: %s", e)
+        logger.warning(f"🔌 DuMate 桌面端适配器注册失败: {e}")
 
     # 列出所有已注册适配器
     adapters = registry.list_adapters()
-    logger.info("🔌 AI 适配器列表: %s",
-                [f"{a.ai_id}({a.connected})" for a in adapters])
+    logger.info(
+        f"🔌 AI 适配器列表: {[f'{a.ai_id}({a.connected})' for a in adapters]}"
+    )
 
     yield
     

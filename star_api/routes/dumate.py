@@ -27,8 +27,46 @@ from star_core.dumate_bridge import (
 from star_core.dumate_work_parser import DuMateWorkParser, DuMateTask
 from star_core.ai_adapter import get_adapter_registry, get_adapter
 
-#: Trae Work 的 CDP 调试端口（与 TraeWorkAdapter / trae_launcher 保持一致）
-_TRAE_CDP_PORT = 9223
+#: 各适配器连接/重启失败时的排障指引（按 ai_id）。没有条目的适配器用通用文案。
+_CONNECT_HINTS = {
+    "trae_work": (
+        "Star 已自动把 remote-debugging-port 写入 ~/.trae-cn/argv.json 并以零参数"
+        "启动 Trae，但 CDP 端口仍不可用。常见原因：① Trae 未安装；② 已有 Trae 实例"
+        "占用单实例锁，请先彻底关闭 Trae 再点“连接”；③ Trae 启动较慢，可稍后重试"
+        "或用“重启并连接”按钮强制重启。"
+    ),
+    "dumate_app": (
+        "DuMate 是单实例应用且不读 argv.json，只能命令行直传调试端口。"
+        "若 DuMate 已在运行但没带调试端口，“连接”不会去打断它——请点“重启并连接”，"
+        "Star 会关闭现有 DuMate 再以调试端口重启。其它可能原因：① DuMate 未安装；"
+        "② 启动较慢，可稍后重试。"
+    ),
+}
+
+#: 重启失败时的排障指引（按 ai_id）
+_RESTART_HINTS = {
+    "trae_work": (
+        "Star 已关闭现有 Trae、把 remote-debugging-port 写入 argv.json 并以零参数"
+        "重启，但 CDP 端口仍不可用。常见原因：① Trae 未正确安装；② 重启后窗口/端口"
+        "尚未就绪（Trae 启动较慢，可稍后重试连接）；③ 本机有其它机制阻止 CDP 端口绑定。"
+    ),
+    "dumate_app": (
+        "Star 已关闭现有 DuMate 并带调试端口重启，但 CDP 端口仍不可用。常见原因："
+        "① 未找到 DuMate.exe；② 重启后窗口/端口尚未就绪，可稍后重试连接；"
+        "③ 本机有其它机制阻止 CDP 端口绑定。"
+    ),
+}
+
+
+def _adapter_port(adapter) -> Optional[int]:
+    """取适配器的调试端口（CDP 型适配器有 ``port`` 属性）。"""
+    port = getattr(adapter, "port", None)
+    return port if isinstance(port, int) else None
+
+
+def _can_restart(adapter) -> bool:
+    """该适配器是否支持"带调试端口重启"（会终止并重新拉起目标进程）。"""
+    return callable(getattr(adapter, "restart_with_cdp", None))
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/dumate", tags=["搭子桥"])
@@ -168,13 +206,31 @@ async def list_adapters():
     """列出所有已注册的 AI 适配器
 
     通过 AIAdapterRegistry 获取所有已注册的 AI 适配器信息。
-    每个适配器报告其 AI_ID、名称、连接状态和能力列表。
+    每个适配器报告其 AI_ID、名称、连接状态、能力列表，并附加 UI 需要的
+    ``alive``（端口可达）/ ``can_restart``（支持带调试端口重启）/ ``port``。
     """
     registry = get_adapter_registry()
-    adapters = registry.list_adapters()
+
+    def _snapshot() -> list[dict]:
+        out = []
+        for info in registry.list_adapters():
+            d = info.to_dict()
+            a = registry.get(info.ai_id)
+            if a is not None:
+                try:
+                    d["alive"] = bool(a.is_alive())
+                except Exception:
+                    d["alive"] = False
+                d["can_restart"] = _can_restart(a)
+                d["port"] = _adapter_port(a)
+            out.append(d)
+        return out
+
+    adapters = await run_in_threadpool(_snapshot)
+    default = registry.get_default()
     return {
-        "adapters": [a.to_dict() for a in adapters],
-        "default": registry.get_default().AI_ID if registry.get_default() else None,
+        "adapters": adapters,
+        "default": default.AI_ID if default else None,
         "count": len(adapters),
     }
 
@@ -197,15 +253,13 @@ async def connect_adapter(ai_id: str):
     # 连接可能自动拉起目标 AI（如 Trae），耗时较长，放到线程避免阻塞事件循环
     ok = await asyncio.to_thread(adapter.connect)
     if not ok:
-        detail = (
-            f"连接 Trae Work 失败：Star 已自动把 remote-debugging-port 写入 "
-            f"~/.trae-cn/argv.json 并以零参数启动 Trae，但 CDP 端口 "
-            f"{_TRAE_CDP_PORT} 仍不可用。常见原因：① Trae 未安装；"
-            f"② 已有 Trae 实例占用单实例锁，请先彻底关闭 Trae 再点“连接”；"
-            f"③ Trae 启动较慢，可稍后重试或用“检测并重启 Trae”按钮强制重启。"
-            if ai_id == "trae_work"
-            else f"连接 {adapter.AI_NAME} 失败"
-        )
+        port = _adapter_port(adapter)
+        detail = f"连接 {adapter.AI_NAME} 失败"
+        if port:
+            detail += f"（CDP 端口 {port} 不可用）"
+        hint = _CONNECT_HINTS.get(ai_id)
+        if hint:
+            detail += "：" + hint
         return {
             "success": False,
             "ai_id": ai_id,
@@ -226,12 +280,12 @@ async def connect_adapter(ai_id: str):
 
 @router.post("/adapters/{ai_id}/restart")
 async def restart_adapter(ai_id: str):
-    """关闭正在运行的实例并以调试端口重启指定 AI 适配器（当前用于 Trae Work）
+    """关闭正在运行的实例并以调试端口重启指定 AI 适配器
 
-    仅对实现了 ``restart_with_cdp`` 的适配器生效（Trae Work）。
-    会先终止所有正在运行的 Trae 进程，把 remote-debugging-port 写入 argv.json，
-    再以零参数重新启动（由主进程读取 argv.json 开启 CDP）并完成连接
-    ——一键解决"Trae 已开但未带调试端口"的困境。
+    仅对实现了 ``restart_with_cdp`` 的适配器生效（当前为 Trae Work 与
+    DuMate 桌面端）。**这会终止用户正在使用的目标 AI 进程**，是"目标 AI
+    已开但没带调试端口"这一困境的唯一解法（两者都是单实例应用）。
+    普通的 ``connect`` 不会打断已运行实例。
 
     Returns:
         {"success": bool, "ai_id": str, "ai_name": str, "message": str}
@@ -241,25 +295,29 @@ async def restart_adapter(ai_id: str):
     if not adapter:
         raise HTTPException(status_code=404, detail=f"AI 适配器 {ai_id} 未注册")
 
-    if not hasattr(adapter, "restart_with_cdp"):
+    if not _can_restart(adapter):
         return {
             "success": False,
             "ai_id": ai_id,
             "ai_name": adapter.AI_NAME,
-            "message": f"{adapter.AI_NAME} 不支持重启（该操作仅适用于 Trae Work）",
+            "message": f"{adapter.AI_NAME} 不支持带调试端口重启",
         }
+
+    port = _adapter_port(adapter)
+    logger.warning(
+        "restart_adapter: 即将终止并重启 %s（ai_id=%s, 调试端口 %s）",
+        adapter.AI_NAME, ai_id, port,
+    )
 
     # 重启会终止并重新拉起目标 AI 进程，耗时较长，放到线程避免阻塞事件循环
     ok = await asyncio.to_thread(adapter.restart_with_cdp)
     if not ok:
-        detail = (
-            f"重启 Trae Work 失败：Star 已关闭现有 Trae、把 remote-debugging-port "
-            f"写入 argv.json 并以零参数重启，但 CDP 端口 {_TRAE_CDP_PORT} 仍不可用。"
-            f"常见原因：① Trae 未正确安装；② 重启后窗口/端口尚未就绪"
-            f"（Trae 启动较慢，可稍后重试连接）；③ 本机有其它机制阻止 CDP 端口绑定。"
-            if ai_id == "trae_work"
-            else f"重启 {adapter.AI_NAME} 失败"
-        )
+        detail = f"重启 {adapter.AI_NAME} 失败"
+        if port:
+            detail += f"（CDP 端口 {port} 不可用）"
+        hint = _RESTART_HINTS.get(ai_id)
+        if hint:
+            detail += "：" + hint
         return {
             "success": False,
             "ai_id": ai_id,
@@ -268,11 +326,12 @@ async def restart_adapter(ai_id: str):
         }
 
     registry.set_default(ai_id)
+    suffix = f"（调试端口 {port}）" if port else ""
     return {
         "success": True,
         "ai_id": ai_id,
         "ai_name": adapter.AI_NAME,
-        "message": f"已重启并连接 {adapter.AI_NAME}（调试端口 {_TRAE_CDP_PORT}）",
+        "message": f"已重启并连接 {adapter.AI_NAME}{suffix}",
     }
 
 
