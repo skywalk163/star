@@ -40,3 +40,15 @@ Thumbs.db
 # 临时文件
 tmp/
 temp/
+
+# AI 助手工作目录（脚本草稿、会话缓存，不入库）
+.comate/
+.dumate/
+.workbuddy/
+
+# bootstrap_env.py 就地安装的依赖
+.pylibs/
+
+# 截图产物
+screenshots/
+screenshot_*.png
