@@ -83,6 +83,117 @@ _DUMATE_CONFIG_DIR = os.path.expanduser("~/.comate")
 _AGENT_OUTPUT_DIR = os.path.join(_DUMATE_ENGINE_DIR, "store", "agents")
 _KERNEL_LOG_DIR = os.path.join(_DUMATE_ENGINE_DIR, "log")
 
+#: 会话存储目录。内核把每个会话的完整内容写成单个 JSON 文件
+#: ``store/chat_session_<sessionUuid>``，并在 ``store/comate_chat_sessions.jsonl``
+#: 维护一行一条的会话索引。这是结果的**权威来源**；
+#: ``store/agents/*.output`` 只存放 IDE 自身 subagent 的转录，不是会话结果。
+_SESSION_STORE_DIR = os.path.join(_DUMATE_ENGINE_DIR, "store")
+_SESSION_INDEX_FILE = os.path.join(_SESSION_STORE_DIR, "comate_chat_sessions.jsonl")
+
+#: assistant 消息 elements 树里承载"用户可见回复"的节点类型。
+#: REASON 是思考过程、TOOL 是工具调用，都不算回复正文。
+_VISIBLE_ELEMENT_TYPES = ("TEXT",)
+
+
+def read_session_index() -> list:
+    """读取会话索引 ``comate_chat_sessions.jsonl``。
+
+    索引按追加写入，同一 sessionUuid 会出现多行（每次更新追加一条），
+    故按 sessionUuid 去重并保留 utime 最大的那条。
+
+    Returns:
+        会话字典列表，按 utime 降序。读不到时返回空列表。
+    """
+    if not os.path.isfile(_SESSION_INDEX_FILE):
+        return []
+    latest: dict = {}
+    try:
+        with open(_SESSION_INDEX_FILE, encoding="utf-8", errors="replace") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    rec = json.loads(line)
+                except Exception:
+                    continue
+                suuid = rec.get("sessionUuid")
+                if not suuid:
+                    continue
+                prev = latest.get(suuid)
+                if prev is None or rec.get("utime", 0) >= prev.get("utime", 0):
+                    latest[suuid] = rec
+    except Exception as e:
+        logger.warning("read_session_index: 读取 %s 失败: %s", _SESSION_INDEX_FILE, e)
+        return []
+    return sorted(latest.values(), key=lambda r: r.get("utime", 0), reverse=True)
+
+
+def read_session_file(session_uuid: str) -> Optional[dict]:
+    """读取单个会话的完整 JSON（``store/chat_session_<uuid>``）。
+
+    Returns:
+        解析后的 dict；文件不存在或解析失败返回 None。
+    """
+    path = os.path.join(_SESSION_STORE_DIR, f"chat_session_{session_uuid}")
+    if not os.path.isfile(path):
+        return None
+    try:
+        with open(path, encoding="utf-8", errors="replace") as f:
+            data = json.load(f)
+        return data if isinstance(data, dict) else None
+    except Exception:
+        return None
+
+
+def _collect_visible_text(node, out: list) -> None:
+    """递归收集 elements 树中可见回复文本。
+
+    节点形如 ``{"type": "TEXT", "content": "...", "children": [...]}``，
+    也存在只有 children 的容器节点（type 缺失），故需无条件下钻。
+    """
+    if isinstance(node, dict):
+        if node.get("type") in _VISIBLE_ELEMENT_TYPES:
+            content = node.get("content")
+            if isinstance(content, str) and content.strip():
+                out.append(content)
+        for value in node.values():
+            _collect_visible_text(value, out)
+    elif isinstance(node, list):
+        for item in node:
+            _collect_visible_text(item, out)
+
+
+def extract_session_reply(session_uuid: str) -> Optional[dict]:
+    """提取会话中最后一条 assistant 回复的正文与状态。
+
+    Returns:
+        ``{"text": str, "status": str, "completed": bool}``；
+        会话不存在或还没有 assistant 消息时返回 None。
+    """
+    data = read_session_file(session_uuid)
+    if not data:
+        return None
+    messages = data.get("messages")
+    if not isinstance(messages, list):
+        return None
+    assistants = [
+        m for m in messages if isinstance(m, dict) and m.get("role") == "assistant"
+    ]
+    if not assistants:
+        return None
+    last = assistants[-1]
+    chunks: list = []
+    _collect_visible_text(last.get("elements"), chunks)
+    status = str(last.get("status") or "")
+    return {
+        "text": "\n\n".join(chunks).strip(),
+        "status": status,
+        # inProgress 表示仍在生成；success/cancelled/failed 视为已收尾
+        "completed": status not in ("inProgress", ""),
+    }
+
+
 #: 任务类型 → Agent 策略映射
 TASK_TYPE_STRATEGIES = {
     "work": "TODOS",
@@ -475,66 +586,49 @@ class DuMateBridge(AIAdapter):
         return "idle"
 
     def list_conversations(self) -> list[dict]:
-        """从内核日志和缓存获取所有会话列表"""
-        sessions = {}
+        """获取所有会话列表。
 
-        # 从缓存中获取
-        for suuid, status in self.session_status.items():
+        权威来源是会话索引 ``store/comate_chat_sessions.jsonl``（内核写入，
+        按 sessionUuid 去重取最新）。管道事件缓存 ``session_status`` 作为
+        补充叠加（若 reader 线程恰好收到过实时状态）。
+        """
+        sessions: dict = {}
+
+        # 1. 会话索引（权威、离线可读，不依赖管道存活）
+        for rec in read_session_index():
+            suuid = rec.get("sessionUuid")
+            if not suuid:
+                continue
             sessions[suuid] = {
                 "conversation_id": suuid,
-                "title": status.get("title", ""),
-                "status": status.get("status", "unknown"),
-                "workspace_id": status.get("workspaceId", ""),
-                "workspace_name": status.get("workspaceName", ""),
-                "ctime": status.get("ctime", 0),
-                "utime": status.get("utime", 0),
+                "title": rec.get("title", ""),
+                "status": rec.get("status", "unknown"),
+                "workspace_id": rec.get("workspaceId")
+                or rec.get("workspaceDirectory", ""),
+                "workspace_name": rec.get("workspaceName", ""),
+                "ctime": rec.get("ctime", 0),
+                "utime": rec.get("utime", 0),
             }
 
-        # 从内核日志补充
-        log_file = _get_kernel_log_file()
-        if log_file:
-            try:
-                with open(log_file, "r", encoding="utf-8", errors="ignore") as f:
-                    for line in f:
-                        m = re.search(
-                            r'SESSION_STATUS_UPDATED.*?"sessionUuid":"([^"]+)".*?'
-                            r'"title":"([^"]+)".*?'
-                            r'"status":"([^"]+)".*?'
-                            r'"workspaceId":"([^"]+)".*?'
-                            r'"workspaceName":"([^"]+)"',
-                            line,
-                        )
-                        if m:
-                            suuid = m.group(1)
-                            if suuid not in sessions:
-                                sessions[suuid] = {
-                                    "conversation_id": suuid,
-                                    "title": m.group(2),
-                                    "status": m.group(3),
-                                    "workspace_id": m.group(4),
-                                    "workspace_name": m.group(5),
-                                    "ctime": 0,
-                                    "utime": 0,
-                                }
-                        # 提取会话创建
-                        m2 = re.search(
-                            r'START_NEW_CHAT.*?"conversationId":"([^"]+)"',
-                            line,
-                        )
-                        if m2 and m2.group(1) not in sessions:
-                            sessions[m2.group(1)] = {
-                                "conversation_id": m2.group(1),
-                                "title": "",
-                                "status": "created",
-                                "workspace_id": "",
-                                "workspace_name": "",
-                                "ctime": 0,
-                                "utime": 0,
-                            }
-            except Exception:
-                pass
+        # 2. 管道事件缓存叠加（实时状态优先覆盖）
+        for suuid, status in self.session_status.items():
+            merged = sessions.get(suuid, {"conversation_id": suuid})
+            merged.update({
+                "title": status.get("title", merged.get("title", "")),
+                "status": status.get("status", merged.get("status", "unknown")),
+                "workspace_id": status.get(
+                    "workspaceId", merged.get("workspace_id", "")),
+                "workspace_name": status.get(
+                    "workspaceName", merged.get("workspace_name", "")),
+                "ctime": status.get("ctime", merged.get("ctime", 0)),
+                "utime": status.get("utime", merged.get("utime", 0)),
+            })
+            sessions[suuid] = merged
 
-        return list(sessions.values())
+        return sorted(
+            sessions.values(), key=lambda s: s.get("utime", 0), reverse=True
+        )
+
 
     def get_capabilities(self) -> list[AICapability]:
         """获取 DuMate 支持的能力列表"""
@@ -912,7 +1006,9 @@ class DuMateBridge(AIAdapter):
     ) -> Optional[str]:
         """获取指定会话的 Agent 输出内容
 
-        映射优先级（修复缺陷②：绝不再回退到"最近修改的文件"谎报 found=True）：
+        映射优先级：
+        0. 会话存储直读（权威来源）：``store/chat_session_<uuid>`` 里最后一条
+           assistant 消息的可见正文。内核就是把结果写在这里的。
         1. 数字 taskId 直达：直接匹配 ``*_<taskId>.output``
         2. 会话 UUID 精确映射：使用创建任务时建立的 ``conversation_id → taskId`` 映射
         3. 内核日志回退：若映射未命中，扫描内核日志中 ``conversation_id`` 关联的行，
@@ -937,6 +1033,12 @@ class DuMateBridge(AIAdapter):
                 return "\n".join(lines)
             except Exception:
                 return None
+
+        # 0. 会话存储直读：内核把会话正文写在 store/chat_session_<uuid>
+        reply = extract_session_reply(conversation_id)
+        if reply and reply["text"]:
+            lines = reply["text"].split("\n")
+            return "\n".join(lines[:max_lines]) if max_lines else reply["text"]
 
         output_dir = Path(_AGENT_OUTPUT_DIR)
 

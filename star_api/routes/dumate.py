@@ -14,6 +14,7 @@ import time
 from typing import List, Optional
 
 from fastapi import APIRouter, HTTPException, Request
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
@@ -273,6 +274,9 @@ async def restart_adapter(ai_id: str):
         "ai_name": adapter.AI_NAME,
         "message": f"已重启并连接 {adapter.AI_NAME}（调试端口 {_TRAE_CDP_PORT}）",
     }
+
+
+@router.post("/adapters/{ai_id}/disconnect")
 async def disconnect_adapter(ai_id: str):
     """断开指定 AI 适配器"""
     registry = get_adapter_registry()
@@ -316,7 +320,8 @@ async def create_task_via_adapter(ai_id: str, req: CreateTaskRequest):
     if not adapter.connected:
         raise HTTPException(status_code=503, detail=f"AI 适配器 {ai_id} 未连接")
 
-    result = adapter.create_task(
+    result = await run_in_threadpool(
+        adapter.create_task,
         prompt=req.prompt,
         workspace_id=req.workspace_id,
         task_type=req.task_type,
@@ -354,12 +359,16 @@ async def get_adapter_status(ai_id: str):
     if not adapter:
         raise HTTPException(status_code=404, detail=f"AI 适配器 {ai_id} 未注册")
 
+    def _snapshot() -> dict:
+        return {"alive": adapter.is_alive(), "status": adapter.get_status()}
+
+    snap = await run_in_threadpool(_snapshot)
     return {
         "ai_id": ai_id,
         "ai_name": adapter.AI_NAME,
         "connected": adapter.connected,
-        "alive": adapter.is_alive(),
-        "status": adapter.get_status(),
+        "alive": snap["alive"],
+        "status": snap["status"],
     }
 
 
@@ -387,7 +396,7 @@ async def get_adapter_task_output(ai_id: str, task_id: str, max_lines: int = 200
     if not adapter.connected:
         return base
 
-    content = adapter.get_task_output(task_id, max_lines=max_lines)
+    content = await run_in_threadpool(adapter.get_task_output, task_id, max_lines=max_lines)
     if content is None:
         return base
 
