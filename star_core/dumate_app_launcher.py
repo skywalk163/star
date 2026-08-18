@@ -6,13 +6,14 @@
 命令 ``COMATE_AGENT_*``、数据目录 ``~/.comate-engine``。
 
 本模块驱动的是**另一个独立产品**：独立安装的 DuMate 桌面端
-（``DuMate.exe``，Electron 43.1.1 / DuMate 1.0.69，用户数据目录
+（``DuMate.exe``，Electron 43，用户数据目录
 ``%APPDATA%\\qianfan-desktop-app``）。两者进程、端口、协议均不相干，
 故以 ``dumate_app_`` 前缀区分，避免与既有 ``dumate_`` 模块冲突。
 
 == 为什么必须重启才能拿到 CDP（已静态确认）============================
-对 ``resources/app.asar`` 扫描结果：
-  - ``remote-debugging-port`` 出现 0 次、``appendSwitch`` 出现 0 次
+对 ``resources/app.asar`` 扫描结果（1.0.69 首次确认，1.0.70 复核结论不变）：
+  - ``remote-debugging-port`` 出现 0 次、``appendSwitch`` 出现 0 次、
+    ``argv.json`` 出现 0 次
     → 应用自身不读 argv.json、也不注入该开关，Trae 那套"写 argv.json 后
     零参数启动"的绕行通道在这里**不存在**；只能在命令行直传。
   - ``requestSingleInstanceLock()`` 出现 2 次，未拿到锁即 ``app.quit()``
@@ -114,6 +115,53 @@ def find_dumate_app_exe() -> Optional[str]:
             return path
     found = shutil.which("DuMate.exe")
     return found or None
+
+
+def get_installed_version() -> Optional[str]:
+    """读取已安装 DuMate.exe 的产品版本号（如 ``"1.0.70"``）；读不到返回 None。
+
+    Windows 下从 exe 的 ``VS_FIXEDFILEINFO`` 取 ProductVersion。用于诊断与升级
+    察觉：DuMate 每次发版都会换前端资源哈希、偶尔调 DOM，把版本号一并暴露给
+    :func:`get_cdp_readiness`，日志里就能看清"当前适配的是哪个版本"，出问题时
+    先对版本而不是先怀疑代码。
+
+    实现完全 best-effort：非 Windows、无 pywin32、路径缺失等一律返回 None，
+    绝不抛错——这只是锦上添花的诊断信息，不该阻断启动链路。
+    """
+    exe = find_dumate_app_exe()
+    if not exe or os.name != "nt":
+        return None
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        ver = ctypes.windll.version
+        size = ver.GetFileVersionInfoSizeW(exe, None)
+        if not size:
+            return None
+        buf = ctypes.create_string_buffer(size)
+        if not ver.GetFileVersionInfoW(exe, 0, size, buf):
+            return None
+        block = ctypes.c_void_p()
+        length = wintypes.UINT()
+        if not ver.VerQueryValueW(
+            buf, "\\", ctypes.byref(block), ctypes.byref(length)
+        ):
+            return None
+        # VS_FIXEDFILEINFO: dwFileVersionMS/LS 在偏移 8..16（各两个 WORD）
+        ffi = ctypes.cast(
+            block, ctypes.POINTER(ctypes.c_uint * 4)
+        ).contents
+        ms, ls = ffi[2], ffi[3]
+        parts = (ms >> 16 & 0xFFFF, ms & 0xFFFF, ls >> 16 & 0xFFFF, ls & 0xFFFF)
+        # 末位通常是构建号 0，去掉尾部的 0 段更贴近展示的 "1.0.70"
+        trimmed = list(parts)
+        while len(trimmed) > 2 and trimmed[-1] == 0:
+            trimmed.pop()
+        return ".".join(str(n) for n in trimmed)
+    except Exception:  # pragma: no cover - 纯诊断信息，任何异常都降级
+        return None
+
 
 
 def _iter_dumate_procs():
@@ -297,7 +345,8 @@ def get_cdp_readiness(port: int = DEFAULT_DUMATE_APP_CDP_PORT) -> dict:
     """汇报 CDP 通道就绪度，供 API / UI 展示与引导。
 
     Returns:
-        dict: ``exe`` 安装路径（None 表示未安装）；``running`` 是否在跑；
+        dict: ``exe`` 安装路径（None 表示未安装）；``version`` 已安装版本号；
+        ``running`` 是否在跑；
         ``running_cdp_port`` 当前实例命令行上的调试端口；
         ``port_alive`` 目标端口是否已监听；
         ``needs_restart`` 在跑但目标端口不可用（需重启才能开 CDP）；
@@ -308,6 +357,7 @@ def get_cdp_readiness(port: int = DEFAULT_DUMATE_APP_CDP_PORT) -> dict:
     return {
         "port": port,
         "exe": find_dumate_app_exe(),
+        "version": get_installed_version(),
         "user_data_dir": USER_DATA_DIR,
         "running": running,
         "running_cdp_port": get_running_cdp_port(),

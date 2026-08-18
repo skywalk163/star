@@ -3,21 +3,33 @@
 命名与产品澄清见 :mod:`star_core.dumate_app_launcher`。本模块驱动的是独立安装的
 DuMate 桌面端，**不是** 仓库里历史命名为 ``dumate`` 的 Comate。
 
-DOM 拓扑（2026-08-16 实测，DuMate 1.0.69 / Electron 43）
---------------------------------------------------------
+DOM 拓扑（2026-08-16 实测 DuMate 1.0.69；2026-08-17 静态复核 1.0.70 / Electron 43）
+------------------------------------------------------------------------------
 与 Comate 不同，DuMate 的调试端口下**只有一个 page target**
 （``file://.../app.asar/frontend/index.html``，title「百度搭子」），聊天 UI 就在
 这个顶层文档里，无 webview / iframe 外壳，可直接 evaluate::
 
     [data-lexical-editor="true"]   ← 输入框（Lexical 富文本，非原生 textarea）
     button[title="发送"]            ← 发送按钮，空输入时 disabled
-    [class*="markdownBody"]        ← 每条消息渲染后的正文
-    [class*="sessionItem"]         ← 左侧最近会话项
+    [data-markdown-body]           ← 每条消息渲染后的正文（无哈希，首选）
     button[aria-label="新任务"]     ← 新建任务（开新会话）
 
-CSS-module 类名带构建哈希（``markdownBody-YMvJCu``），跨版本会变，故一律用
-``[class*="前缀"]`` 子串匹配，不写死哈希后缀；语义明确的 ``title`` /
-``aria-label`` / ``data-*`` 属性优先。
+CSS-module 类名带构建哈希，且**每次发版都会变**：``markdownBody`` 在 1.0.69 是
+``markdownBody-YMvJCu``、1.0.70 变成 ``markdownBody-AfTAIf``（旧哈希作为遗留模块
+仍留在同一份 bundle 里，所以"能搜到旧类名"不代表页面用的是旧类名）。因此：
+
+1. 一律不写死哈希后缀，用 ``[class*="前缀"]`` 子串匹配；
+2. 更进一步——凡是有语义属性的地方优先用属性。正文容器上有
+   ``data-markdown-body``（1.0.70 确认：``className:cx(markdownBody,
+   {markdownBodyLight:light===codeTheme})`` 与该属性同元素，所以子串匹配
+   不会因浅色主题类名而重复计数），消息角色有 ``data-message-role``，
+   按钮有 ``title`` / ``aria-label``。
+3. 每个角色都配**按优先级排序的候选选择器**（见 ``_*_SELS``），逐个 try 而不是
+   拼成一条逗号选择器——``querySelector('a,b')`` 返回的是**文档顺序**最靠前的
+   元素，不是选择器顺序，拼在一起会让"优先用精确选择器"的意图失效。
+
+版本升级后先跑 :meth:`DuMateAppCDPBridge.probe_selectors` 体检，一次看清每个角色
+命中了哪条候选、命中几个，比等发送失败再回溯快得多。
 
 输入注入：Lexical 把内容存在自己的 model 里，直接改 DOM 不被感知。必须
 **聚焦后走 CDP ``Input.insertText``**（浏览器真实输入管线），实测生效且发送按钮
@@ -55,27 +67,66 @@ logger = logging.getLogger(__name__)
 #: 顶层页面 URL 特征（用于在 /json 里定位聊天页）
 _PAGE_URL_HINT = "index.html"
 
-#: 输入框选择器（Lexical 富文本编辑器）
-_INPUT_SEL = '[data-lexical-editor="true"]'
+# 每个角色一组**按优先级排序**的候选选择器：语义属性（跨版本最稳）在前，
+# 类名子串兜底在后。逐个 try（见 _first_matching_js），不拼成一条逗号选择器——
+# querySelector('a,b') 取文档顺序最靠前者而非选择器顺序，会让优先级失效。
 
-#: 发送按钮选择器
-_SEND_SEL = 'button[title="发送"]'
-
-#: 停止按钮选择器（生成中出现）
-_STOP_SEL = (
-    'button[title*="停止"],button[aria-label*="停止"],'
-    'button[title*="中止"],button[aria-label*="中止"],'
-    'button[title*="Stop"],button[aria-label*="Stop"]'
+#: 输入框（Lexical 富文本编辑器）
+_INPUT_SELS = (
+    '[data-lexical-editor="true"]',
+    '[contenteditable="true"][data-lexical-editor]',
+    '[contenteditable="true"]',
 )
 
-#: 每条消息正文（markdown 渲染容器）
-_MSG_SEL = '[class*="markdownBody"]'
+#: 发送按钮
+_SEND_SELS = (
+    'button[title="发送"]',
+    'button[aria-label="发送"]',
+    'button[class*="sendButton"]',
+)
+
+#: 停止按钮（生成中出现）
+_STOP_SELS = (
+    'button[title*="停止"]',
+    'button[aria-label*="停止"]',
+    'button[title*="中止"]',
+    'button[aria-label*="中止"]',
+    'button[title*="Stop"]',
+    'button[aria-label*="Stop"]',
+    'button[class*="stopButton"]',
+)
+
+#: 每条消息正文（markdown 渲染容器）。data-markdown-body 无哈希、跨版本稳定，首选。
+_MSG_SELS = (
+    '[data-markdown-body]',
+    '[class*="markdownBody"]',
+)
 
 #: 助手回复容器标记（外层带 data-message-role="assistant"）
-_ASSISTANT_MSG_SEL = '[data-message-role="assistant"] [class*="markdownBody"]'
+_ASSISTANT_MSG_SELS = (
+    '[data-message-role="assistant"] [data-markdown-body]',
+    '[data-message-role="assistant"] [class*="markdownBody"]',
+    '[data-assistant-block-id] [data-markdown-body]',
+    '[data-assistant-block-id] [class*="markdownBody"]',
+)
 
 #: 新建任务按钮
-_NEW_TASK_SEL = 'button[aria-label="新任务"]'
+_NEW_TASK_SELS = (
+    'button[aria-label="新任务"]',
+    'button[title="新任务"]',
+)
+
+# --- 供体检/日志展示的首选选择器（每组第 0 条），保持旧变量名兼容 ---
+_INPUT_SEL = _INPUT_SELS[0]
+_SEND_SEL = _SEND_SELS[0]
+_MSG_SEL = _MSG_SELS[0]
+_ASSISTANT_MSG_SEL = _ASSISTANT_MSG_SELS[0]
+_NEW_TASK_SEL = _NEW_TASK_SELS[0]
+
+
+def _js_sel_list(sels: tuple[str, ...]) -> str:
+    """把候选选择器组渲染成 JS 数组字面量。"""
+    return "[" + ",".join(json.dumps(s) for s in sels) + "]"
 
 
 def _js(expr_body: str) -> str:
@@ -83,16 +134,35 @@ def _js(expr_body: str) -> str:
     return "(() => {" + expr_body + "})()"
 
 
+# JS 侧公共助手：按候选顺序返回首个命中的元素 / 全部命中的最长列表。
+# 注入到每段脚本前部，避免每处重复实现。
+_JS_HELPERS = (
+    "const _q=(sels)=>{for(const s of sels){const el=document.querySelector(s);"
+    "if(el)return el;}return null;};"
+    "const _qa=(sels)=>{for(const s of sels){const els=document.querySelectorAll(s);"
+    "if(els.length)return els;}return document.querySelectorAll('#__none__');};"
+)
+
+_INPUT_JS_ARR = _js_sel_list(_INPUT_SELS)
+_SEND_JS_ARR = _js_sel_list(_SEND_SELS)
+_STOP_JS_ARR = _js_sel_list(_STOP_SELS)
+_MSG_JS_ARR = _js_sel_list(_MSG_SELS)
+_ASSISTANT_JS_ARR = _js_sel_list(_ASSISTANT_MSG_SELS)
+_NEW_TASK_JS_ARR = _js_sel_list(_NEW_TASK_SELS)
+
+
 #: JS：读取输入框文本（Lexical 用 innerText）
 _GET_INPUT_JS = _js(
-    "const el=document.querySelector(" + json.dumps(_INPUT_SEL) + ");"
+    _JS_HELPERS
+    + "const el=_q(" + _INPUT_JS_ARR + ");"
     "if(!el)return null;"
     "return {text:(el.innerText||'').replace(/\\n$/,'')};"
 )
 
 #: JS：聚焦输入框（供 Input.insertText 前置）
 _FOCUS_INPUT_JS = _js(
-    "const el=document.querySelector(" + json.dumps(_INPUT_SEL) + ");"
+    _JS_HELPERS
+    + "const el=_q(" + _INPUT_JS_ARR + ");"
     "if(!el)return false;"
     "el.focus();"
     "return document.activeElement===el;"
@@ -100,7 +170,8 @@ _FOCUS_INPUT_JS = _js(
 
 #: JS：全选输入框内容（清空前置）
 _SELECT_ALL_JS = _js(
-    "const el=document.querySelector(" + json.dumps(_INPUT_SEL) + ");"
+    _JS_HELPERS
+    + "const el=_q(" + _INPUT_JS_ARR + ");"
     "if(!el)return false;"
     "el.focus();"
     "document.execCommand('selectAll');"
@@ -109,7 +180,8 @@ _SELECT_ALL_JS = _js(
 
 #: JS：点击发送按钮
 _CLICK_SEND_JS = _js(
-    "const b=document.querySelector(" + json.dumps(_SEND_SEL) + ");"
+    _JS_HELPERS
+    + "const b=_q(" + _SEND_JS_ARR + ");"
     "if(!b)return {clicked:false,reason:'no-button'};"
     "if(b.disabled)return {clicked:false,reason:'disabled'};"
     "b.click();"
@@ -118,7 +190,8 @@ _CLICK_SEND_JS = _js(
 
 #: JS：发送按钮是否已解禁（可点击）
 _SEND_ENABLED_JS = _js(
-    "const b=document.querySelector(" + json.dumps(_SEND_SEL) + ");"
+    _JS_HELPERS
+    + "const b=_q(" + _SEND_JS_ARR + ");"
     "return !!b && !b.disabled;"
 )
 
@@ -127,8 +200,9 @@ _SEND_ENABLED_JS = _js(
 #: 优先取带 data-message-role="assistant" 的回复；取不到（DOM 变体）再退回全部
 #: markdownBody 的最后一条。用户自己发的消息不在 markdownBody 里，故不会误取。
 _READ_LATEST_JS = _js(
-    "let items=document.querySelectorAll(" + json.dumps(_ASSISTANT_MSG_SEL) + ");"
-    "if(!items.length)items=document.querySelectorAll(" + json.dumps(_MSG_SEL) + ");"
+    _JS_HELPERS
+    + "let items=_qa(" + _ASSISTANT_JS_ARR + ");"
+    "if(!items.length)items=_qa(" + _MSG_JS_ARR + ");"
     "if(!items.length)return {text:'',count:0};"
     "const last=items[items.length-1];"
     "return {text:(last.innerText||'').trim().slice(0,8000),count:items.length};"
@@ -136,16 +210,18 @@ _READ_LATEST_JS = _js(
 
 #: JS：状态检测（停止按钮出现 => 生成中）
 _DETECT_STATUS_JS = _js(
-    "const stop=document.querySelector(" + json.dumps(_STOP_SEL) + ");"
+    _JS_HELPERS
+    + "const stop=_q(" + _STOP_JS_ARR + ");"
     "if(stop)return {status:'generating',via:'stop-button'};"
-    "const inp=document.querySelector(" + json.dumps(_INPUT_SEL) + ");"
+    "const inp=_q(" + _INPUT_JS_ARR + ");"
     "if(!inp)return {status:'unknown',via:'no-input'};"
     "return {status:'idle',via:'no-stop-button'};"
 )
 
 #: JS：点击停止按钮
 _CLICK_STOP_JS = _js(
-    "const stop=document.querySelector(" + json.dumps(_STOP_SEL) + ");"
+    _JS_HELPERS
+    + "const stop=_q(" + _STOP_JS_ARR + ");"
     "if(!stop)return {clicked:false};"
     "stop.click();"
     "return {clicked:true};"
@@ -153,10 +229,34 @@ _CLICK_STOP_JS = _js(
 
 #: JS：点击「新任务」开新会话
 _CLICK_NEW_TASK_JS = _js(
-    "const b=document.querySelector(" + json.dumps(_NEW_TASK_SEL) + ");"
+    _JS_HELPERS
+    + "const b=_q(" + _NEW_TASK_JS_ARR + ");"
     "if(!b)return {clicked:false};"
     "b.click();"
     "return {clicked:true};"
+)
+
+#: JS：选择器体检——每个角色报告命中的候选与数量，供版本升级时快速定位。
+_PROBE_SELECTORS_JS = _js(
+    "const groups={"
+    "input:" + _INPUT_JS_ARR + ","
+    "send:" + _SEND_JS_ARR + ","
+    "stop:" + _STOP_JS_ARR + ","
+    "message:" + _MSG_JS_ARR + ","
+    "assistant:" + _ASSISTANT_JS_ARR + ","
+    "new_task:" + _NEW_TASK_JS_ARR
+    + "};"
+    "const out={};"
+    "for(const role in groups){"
+    "  let hit=null,total=0;"
+    "  for(const s of groups[role]){"
+    "    const n=document.querySelectorAll(s).length;"
+    "    if(n&&hit===null){hit=s;total=n;}"
+    "  }"
+    "  out[role]={matched:hit,count:total,"
+    "    candidates:groups[role].map(s=>({sel:s,count:document.querySelectorAll(s).length}))};"
+    "}"
+    "return out;"
 )
 
 
@@ -204,6 +304,30 @@ class DuMateAppCDPBridge:
         if tab and tab.get("webSocketDebuggerUrl"):
             return {"webSocketDebuggerUrl": tab["webSocketDebuggerUrl"]}
         return None
+
+    def probe_selectors(self) -> dict:
+        """选择器体检：报告每个角色命中了哪条候选、各候选各命中几个。
+
+        DuMate 每次发版都会换 CSS-module 哈希、偶尔调 DOM 结构，届时故障现象往往
+        是"发送无反应"或"读不到回复"这种间接症状。升级后先调这个方法，一次看清
+        哪个角色 ``matched`` 为 None，比等失败再回溯快得多。
+
+        Returns:
+            ``{"ok": True, "roles": {role: {"matched": sel|None, "count": int,
+            "candidates": [{"sel": str, "count": int}, ...]}}}``；
+            页面不可达时 ``{"ok": False, "reason": "no-target"}``。
+        """
+        target = self.find_chat_target()
+        if not target:
+            return {"ok": False, "reason": "no-target"}
+        result = self._cdp.evaluate(target, _PROBE_SELECTORS_JS)
+        if not isinstance(result, dict):
+            return {"ok": False, "reason": "evaluate-failed"}
+        missing = [role for role, info in result.items() if not info.get("matched")]
+        if missing:
+            logger.warning("DuMateAppCDP: 选择器体检失配角色: %s", ", ".join(missing))
+        return {"ok": not missing, "roles": result, "missing": missing}
+
 
     # ------------------------------------------------------------------
     # 输入框读写
