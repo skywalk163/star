@@ -329,6 +329,14 @@
           min-height: calc(100vh - 56px - env(safe-area-inset-bottom, 0px));
           overflow: visible !important;
         }
+
+        /* 星辉流卡片写的是内联 width:400px / 360px，400px 比 375px 视口还宽，
+           单张卡就要横滑才能看全。这里按视口收窄：留 14vw 露出下一张卡的边，
+           顺带把「可以横滑」这件事变成看得见的提示。
+           必须 !important —— 内联样式优先级高于任何选择器，不加盖不住。 */
+        #starlight-stream-container > .panel-card {
+          width: min(86vw, 400px) !important;
+        }
       }
     </style>
 </head>

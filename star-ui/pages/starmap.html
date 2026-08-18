@@ -446,19 +446,24 @@
               <!-- List View (hidden by default) -->
               <div id="list-view" class="hidden">
                 <div class="rounded-lg border overflow-hidden" style="background:var(--color-bg-panel);border-color:var(--color-border);">
-                  <table class="w-full text-sm">
-                    <thead>
-                      <tr style="background:var(--color-bg-card);">
-                        <th class="text-left px-4 py-2.5 font-medium" style="color:var(--color-text-muted);">星体</th>
-                        <th class="text-left px-4 py-2.5 font-medium" style="color:var(--color-text-muted);">类型</th>
-                        <th class="text-left px-4 py-2.5 font-medium" style="color:var(--color-text-muted);">PID</th>
-                        <th class="text-left px-4 py-2.5 font-medium" style="color:var(--color-text-muted);">状态</th>
-                        <th class="text-right px-4 py-2.5 font-medium" style="color:var(--color-text-muted);">操作</th>
-                      </tr>
-                    </thead>
-                    <tbody id="list-tbody">
-                    </tbody>
-                  </table>
+                  <!-- 表头 5 列都是 whitespace-nowrap，窄屏总宽必然超过视口。外层 rounded 容器
+                       要 overflow-hidden 才能裁出圆角，所以这里单独包一层横向滚动容器：
+                       否则表格是被裁掉而不是可滑动的（375px 上「操作」列直接看不见也点不到）。 -->
+                  <div class="overflow-x-auto">
+                    <table class="w-full text-sm" style="min-width:520px;">
+                      <thead>
+                        <tr style="background:var(--color-bg-card);">
+                          <th class="text-left px-4 py-2.5 font-medium" style="color:var(--color-text-muted);">星体</th>
+                          <th class="text-left px-4 py-2.5 font-medium" style="color:var(--color-text-muted);">类型</th>
+                          <th class="text-left px-4 py-2.5 font-medium" style="color:var(--color-text-muted);">PID</th>
+                          <th class="text-left px-4 py-2.5 font-medium" style="color:var(--color-text-muted);">状态</th>
+                          <th class="text-right px-4 py-2.5 font-medium" style="color:var(--color-text-muted);">操作</th>
+                        </tr>
+                      </thead>
+                      <tbody id="list-tbody">
+                      </tbody>
+                    </table>
+                  </div>
                   <div id="list-empty" class="hidden py-12 text-center" style="color:var(--color-text-muted);">
                     <i data-lucide="inbox" class="w-10 h-10 mx-auto mb-2 opacity-50"></i>
                     <p class="text-sm">暂无星体</p>
