@@ -455,11 +455,27 @@ async def _scan_stars_periodically():
 
 
 # ==================== WebSocket 端点 ====================
+#
+# 这两个端点用 @app.websocket 注册，**不经过 _include_guarded**：
+# 那个包装器挂的是 require_by_method，它读 request.method，对 scope 为 websocket
+# 的连接根本不适用。所以 WebSocket 的鉴权只能写在处理函数体内——
+# 下面每处的 authorize_stream 调用不是漏挂了依赖，而是唯一能生效的位置。
+#
+# 票据（ticket）而非 API Key 走 query 参数的原因见 star_api/auth.py 的
+# 「流式连接票据」一节：浏览器原生 WebSocket 不能设自定义请求头。
+
+from star_api.auth import authorize_stream
 
 @app.websocket("/ws/starlight")
-async def websocket_starlight(websocket: WebSocket):
+async def websocket_starlight(websocket: WebSocket, ticket: Optional[str] = None):
     """星光流 WebSocket 端点"""
+    # 先校验再 accept 不可行（拒绝时客户端只看到握手失败、拿不到原因），
+    # 所以 accept 后立刻用 1008(policy violation) 关闭。
     await websocket.accept()
+    if not authorize_stream(ticket, "read"):
+        await websocket.close(code=1008)
+        return
+
     state.websocket_connections.append(websocket)
     
     try:
@@ -593,16 +609,21 @@ async def _stop_ocr_stream_if_empty(star_id: str):
 
 
 @app.websocket("/ws/ocr/{star_id}")
-async def websocket_ocr_stream(websocket: WebSocket, star_id: str, interval: float = 3.0):
+async def websocket_ocr_stream(websocket: WebSocket, star_id: str, interval: float = 3.0, ticket: Optional[str] = None):
     """
     OCR 实时流 WebSocket 端点
-    
+
     Args:
         star_id: 星体 ID 或 PID
         interval: 识别间隔（秒），默认3秒
+        ticket: 流式连接票据（见 auth.py 的「流式连接票据」一节）
     """
+    # 同 /ws/starlight：accept 后立刻校验，未过 authorize_stream 就 1008 关闭。
     await websocket.accept()
-    
+    if not authorize_stream(ticket, "read"):
+        await websocket.close(code=1008)
+        return
+
     if star_id not in _ocr_stream_clients:
         _ocr_stream_clients[star_id] = []
     
@@ -647,6 +668,7 @@ from star_api.routes.remote import router as remote_router
 from star_api.routes.observability import router as observability_router
 from star_api.routes.locators import router as locators_router
 from star_api.routes.dumate import router as dumate_router
+from star_api.routes.auth_stream import router as auth_stream_router
 
 from star_api.auth import require_by_method
 
@@ -677,6 +699,10 @@ _include_guarded(remote_router, "control", prefix="/api/remote", tags=["远程�
 _include_guarded(observability_router, "admin", prefix="/api/observability", tags=["可观测性"])
 _include_guarded(locators_router, "write", prefix="/api/locators", tags=["定位器校准"])
 _include_guarded(dumate_router, "control")
+# 签发一张 read 作用域票据本身是只读操作（不改任何状态、不操作本机软件），
+# 写成 read 而非 write 才不会把 viewer 挡在事件流之外——viewer 有 read 权限，
+# 本就该能看流；而票据继承调用者角色，权限不会被放大。
+_include_guarded(auth_stream_router, "read")
 
 
 # ==================== 静态文件 & 控制面板 ====================

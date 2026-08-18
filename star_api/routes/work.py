@@ -1,10 +1,9 @@
 from fastapi import APIRouter, HTTPException
+from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel
 from typing import List, Optional, Dict
 from star_core.trae_work_parser import TraeWorkParser, TraeWorkTask
-from star_core.star_emissary import StarEmissary
-from star_api import state
-import time
+from star_core.ai_adapter import get_adapter_registry
 
 router = APIRouter(prefix="/api/work", tags=["工作模式"])
 
@@ -84,81 +83,79 @@ class AIListResponse(BaseModel):
     total: int
 
 
-def _get_emissary_by_id(ai_id: str) -> Optional[StarEmissary]:
-    for e in state.emissaries.values():
-        if str(e.star.pid) == ai_id or e.star.name == ai_id:
-            return e
-    return None
+def _runtime_status(adapter) -> str:
+    """把适配器的运行态收敛成 AIStatus.status 的取值。
+
+    注册表可能仍记着 connected，但适配器实际已掉线（进程被关、调试端口失效）。
+    这种情况按 offline 记——否则会让调用方对着一个死适配器发任务。
+    """
+    if adapter is None or not adapter.connected:
+        return "offline"
+    try:
+        runtime = adapter.get_status()
+    except Exception:
+        # 单个适配器探测失败不该影响整表，按离线处理
+        return "offline"
+    if runtime == "offline":
+        return "offline"
+    if runtime == "generating":
+        return "busy"
+    return "idle"
+
+
+def _to_ai_status(info, adapter) -> AIStatus:
+    """AIAdapterInfo → AIStatus。
+
+    pid / uptime / memory_mb 适配器层面没有对应概念，留 None；
+    字段保留是为了不破坏本接口既有的响应结构。
+    """
+    return AIStatus(
+        ai_id=info.ai_id,
+        name=info.ai_name or info.ai_id,
+        type=info.ai_id,
+        pid=None,
+        status=_runtime_status(adapter),
+        uptime=None,
+        memory_mb=None,
+    )
 
 
 @router.get("/ai", response_model=AIListResponse)
 async def list_ais():
-    """获取所有可用的 AI Agent 列表"""
-    ais = []
-    
-    # 从星使管理器获取在线 AI
-    if hasattr(state, 'emissaries') and state.emissaries:
-        for emissary in state.emissaries.values():
-            status = "busy" if hasattr(emissary, '_busy') and emissary._busy else "idle"
-            uptime = None
-            if emissary.star.started_at:
-                uptime_seconds = time.time() - emissary.star.started_at
-                uptime = f"{int(uptime_seconds // 3600)}h {int((uptime_seconds % 3600) // 60)}m"
-            
-            ais.append(AIStatus(
-                ai_id=str(emissary.star.pid),
-                name=emissary.star.name or f"Star-{emissary.star.pid}",
-                type=emissary.star.type,
-                pid=emissary.star.pid,
-                status=status,
-                uptime=uptime,
-                memory_mb=None,
-            ))
-    
+    """获取所有可用的 AI Agent 列表
+
+    数据源是 AIAdapterRegistry —— 与 /api/dumate/adapters 同一个真相。
+    历史实现读 state.emissaries，而该属性全代码库从未被赋值，导致这里恒返回空表。
+    """
+    registry = get_adapter_registry()
+
+    def _snapshot() -> List[AIStatus]:
+        return [
+            _to_ai_status(info, registry.get(info.ai_id))
+            for info in registry.list_adapters()
+        ]
+
+    ais = await run_in_threadpool(_snapshot)
     return AIListResponse(ais=ais, total=len(ais))
 
 
 @router.get("/ai/{ai_id}/status", response_model=AIStatus)
 async def get_ai_status(ai_id: str):
     """获取指定 AI 的运行状态"""
-    # 尝试从 emissary 获取
-    emissary = _get_emissary_by_id(ai_id)
-    if emissary:
-        status = "busy" if hasattr(emissary, '_busy') and emissary._busy else "idle"
-        uptime = None
-        if emissary.star.started_at:
-            uptime_seconds = time.time() - emissary.star.started_at
-            uptime = f"{int(uptime_seconds // 3600)}h {int((uptime_seconds % 3600) // 60)}m"
-        return AIStatus(
-            ai_id=str(emissary.star.pid),
-            name=emissary.star.name or f"Star-{emissary.star.pid}",
-            type=emissary.star.type,
-            pid=emissary.star.pid,
-            status=status,
-            uptime=uptime,
-            memory_mb=None,
-        )
-    
-    # 尝试从进程获取状态
-    try:
-        import psutil
-        pid = int(ai_id)
-        p = psutil.Process(pid)
-        return AIStatus(
-            ai_id=ai_id,
-            name=f"Process-{pid}",
-            type="unknown",
-            pid=pid,
-            status="running",
-            uptime=None,
-            memory_mb=p.memory_info().rss / 1024 / 1024,
-        )
-    except (ValueError, psutil.NoSuchProcess, psutil.AccessDenied):
-        raise HTTPException(status_code=404, detail=f"AI {ai_id} 未找到或未运行")
+    registry = get_adapter_registry()
+    adapter = registry.get(ai_id)
+    if adapter is None:
+        raise HTTPException(status_code=404, detail=f"AI 适配器 {ai_id} 未注册")
+
+    def _snapshot() -> AIStatus:
+        return _to_ai_status(adapter.get_info(), adapter)
+
+    return await run_in_threadpool(_snapshot)
 
 
 class AskRequest(BaseModel):
     prompt: str
+    #: 已忽略：ai_id 本身就定位到具体适配器。字段保留仅为不破坏旧调用方。
     adapter_name: str = "trae"
     task_id: Optional[str] = None  # 可选：指定任务
     timeout: int = 60
@@ -166,17 +163,27 @@ class AskRequest(BaseModel):
 
 @router.post("/ai/{ai_id}/ask")
 async def ask_ai(ai_id: str, req: AskRequest):
-    """向指定 AI 发送指令"""
-    emissary = _get_emissary_by_id(ai_id)
-    if not emissary:
-        raise HTTPException(status_code=404, detail=f"AI {ai_id} 未找到")
-    
-    try:
-        result = await emissary.ask(
-            prompt=req.prompt,
-            adapter_name=req.adapter_name,
-            timeout=req.timeout,
-        )
-        return result
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    """向指定 AI 发送指令
+
+    走适配器的通用任务接口，与 POST /api/dumate/adapters/{ai_id}/tasks 同一条实现。
+    历史实现 await 了同步的 StarEmissary.ask 并多传 adapter_name，任何调用必抛 TypeError。
+    """
+    registry = get_adapter_registry()
+    adapter = registry.get(ai_id)
+    if adapter is None:
+        raise HTTPException(status_code=404, detail=f"AI 适配器 {ai_id} 未注册")
+    if not adapter.connected:
+        raise HTTPException(status_code=503, detail=f"AI 适配器 {ai_id} 未连接")
+
+    result = await run_in_threadpool(adapter.create_task, prompt=req.prompt)
+
+    if not result.get("success"):
+        raise HTTPException(status_code=500, detail=result.get("message", "发送失败"))
+
+    return {
+        "success": True,
+        "ai_id": ai_id,
+        "conversation_id": result.get("conversation_id", ""),
+        "message": result.get("message", ""),
+    }
+

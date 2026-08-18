@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>搭子桥 - 群星 Star</title>
+  <title>Agents 总览 - 群星 Star</title>
   <style>
     :root {
       --color-bg: #0a0a0f;
@@ -728,14 +728,45 @@
     }
     .adapter-card {
       display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 8px 12px;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 8px;
+      padding: 10px 12px;
       background: var(--color-bg-card);
       border: 1px solid var(--color-border);
       border-radius: var(--radius-sm);
-      min-width: 220px;
+      min-width: 280px;
+      flex: 1 1 300px;
+      max-width: 420px;
+      box-sizing: border-box;
     }
+    /* 卡片头部：状态点 + 名称/状态 + 连接类按钮 */
+    .adapter-head { display: flex; align-items: center; gap: 10px; }
+    .adapter-meta { font-size: 11px; color: var(--color-text-muted); }
+    .adapter-caps { display: flex; gap: 4px; flex-wrap: wrap; }
+    .adapter-cap {
+      font-size: 10px; padding: 2px 6px; border-radius: 4px;
+      background: var(--color-bg); color: var(--color-text-muted);
+      border: 1px solid var(--color-border);
+    }
+    /* 就地发任务区 */
+    .adapter-inline { display: flex; flex-direction: column; gap: 6px; }
+    .adapter-inline textarea {
+      width: 100%; box-sizing: border-box; min-height: 56px; resize: vertical;
+      padding: 6px 8px; font-size: 12px; font-family: inherit;
+      background: var(--color-bg); color: var(--color-text);
+      border: 1px solid var(--color-border); border-radius: 6px;
+    }
+    .adapter-inline-row { display: flex; gap: 6px; align-items: center; }
+    .adapter-output {
+      display: none; max-height: 160px; overflow: auto;
+      white-space: pre-wrap; word-break: break-word;
+      font-family: ui-monospace, Consolas, monospace; font-size: 11px; line-height: 1.5;
+      padding: 6px 8px; border-radius: 6px;
+      background: var(--color-bg); border: 1px solid var(--color-border);
+      color: var(--color-text-secondary, #9ca3af);
+    }
+    .adapter-output.show { display: block; }
     .adapter-card.connected { border-color: rgba(34, 197, 94, 0.4); }
     .adapter-card.offline { border-color: rgba(239, 68, 68, 0.3); }
     .adapter-info { flex: 1; min-width: 0; }
@@ -762,6 +793,22 @@
 
     /* 新建任务弹窗中的目标适配器选择 */
     .adapter-select-row { margin-bottom: 14px; }
+
+    /* ===== 窄屏（手机）适配 ===== */
+    @media (max-width: 768px) {
+      /* 240px 的 fixed 侧栏在窄屏会浮在内容上，导航已交给底部 tab bar */
+      .sidebar { display: none; }
+      .main {
+        margin-left: 0;
+        padding: 16px;
+        /* 100vh 会把被底部 tab bar 遮住的 56px 也算进来，扣掉 */
+        height: calc(100vh - 56px - env(safe-area-inset-bottom, 0px));
+      }
+      .grid-2 { grid-template-columns: 1fr; }
+      /* 卡片原本 min-width:280px + flex-basis:300px，窄屏改为占满一行 */
+      .adapter-card { min-width: 0; flex: 1 1 100%; max-width: none; }
+      .search-box { min-width: 0; width: 100%; }
+    }
   </style>
 </head>
 <body>
@@ -779,7 +826,7 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"/><circle cx="8" cy="6" r="1.5"/><circle cx="8" cy="12" r="1.5"/><circle cx="8" cy="18" r="1.5"/></svg>调度
       </a>
       <a href="/ui/pages/dumate.html" class="nav-item active" data-dom-id="nav-dumate">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>搭子桥
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>Agents
       </a>
       <a href="/ui/pages/settings.html" class="nav-item" data-dom-id="nav-settings">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>设置
@@ -789,8 +836,8 @@
     <!-- 主内容 -->
     <div class="main">
       <div class="page-header">
-        <div class="page-title">搭子桥</div>
-        <div class="page-subtitle">DuMate · PC 端 AI 任务实时操控与管理</div>
+        <div class="page-title">Agents 总览</div>
+        <div class="page-subtitle">Star 接管的全部 AI —— 就地连接、就地发任务、就地看回复</div>
       </div>
 
       <!-- 内核状态栏 -->
@@ -814,7 +861,7 @@
       <div class="adapter-bar" id="adapterBar">
         <div class="adapter-bar-title">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
-          AI 适配器
+          AI 适配器（全部已接管的 Agent）
         </div>
         <div id="adapterList" style="display:flex;gap:10px;flex-wrap:wrap;flex:1">
           <span class="adapter-status-text">加载中...</span>
@@ -957,6 +1004,8 @@
   </div>
 
   <script src="/ui/js/api-bridge.js"></script>
+  <script src="/ui/js/auth-gate.js"></script>
+  <script src="/ui/js/nav.js"></script>
   <script>
     // ===== 状态 =====
     let allTasks = [];
@@ -972,6 +1021,10 @@
 
     // ===== 初始化 =====
     document.addEventListener('DOMContentLoaded', () => {
+      // 填完 Key 后就地重新拉数据，不整页 reload（避免打断已打开的任务详情）
+      if (typeof AuthGate !== 'undefined') {
+        AuthGate.onAuthorized(() => { refreshAll(); loadWorkspaces(); });
+      }
       refreshAll();
       refreshTimer = setInterval(refreshAll, 10000);
       // 加载工作目录列表
@@ -982,20 +1035,40 @@
       connectEventStream();
     });
 
+    // 离开页面时清掉所有就地发任务的轮询定时器，避免泄漏
+    window.addEventListener('beforeunload', () => {
+      Object.keys(_inlinePollTimers).forEach(id => {
+        if (_inlinePollTimers[id]) { clearInterval(_inlinePollTimers[id]); _inlinePollTimers[id] = null; }
+      });
+    });
+
     // ===== SSE 事件流 =====
-    function connectEventStream() {
+    async function connectEventStream() {
       if (eventSource) {
         eventSource.close();
       }
-      eventSource = new EventSource(dumateApi.streamUrl());
+      // 票据一次性，每次（重）连都要重新取；streamUrl() 已封装这一步
+      let url;
+      try {
+        url = await dumateApi.streamUrl();
+      } catch (err) {
+        // 401/403 已由 apiFetch 广播 star:unauthorized，AuthGate 会引导补 Key；
+        // 这里不重连，避免在没 Key 的情况下空转。
+        if (err && (err.status === 401 || err.status === 403)) return;
+        setTimeout(connectEventStream, 3000);
+        return;
+      }
+      eventSource = new EventSource(url);
       eventSource.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
           handleKernelEvent(data);
-        } catch (e) {}
+        } catch (e) {
+          console.error('内核事件解析失败:', e, event.data);
+        }
       };
       eventSource.onerror = () => {
-        // 断线重连
+        // 断线重连：重新走一遍取票据的流程，不能复用旧票据
         setTimeout(connectEventStream, 3000);
       };
     }
@@ -1064,6 +1137,8 @@
     // ===== AI 适配器管理（统一连接入口，含 Trae Work / DuMate 桌面端） =====
     // 显式挂到 window，便于测试/控制台探查
     window.adaptersCache = [];
+    // null=正常；否则 { auth: bool, message: string } 记录本次加载的失败原因
+    window.adaptersError = null;
 
     // 各适配器"未连接"时的引导文案（后端 can_restart 决定是否显示重启按钮）
     const ADAPTER_RESTART_HINTS = {
@@ -1075,15 +1150,51 @@
       try {
         const res = await adapterApi.list();
         window.adaptersCache = res.adapters || [];
+        window.adaptersError = null;
       } catch (e) {
         window.adaptersCache = [];
+        // 区分「鉴权失败」和「其它失败」：前者交给 AuthGate 引导，不再伪装成"未发现适配器"
+        const isAuth = (typeof AuthGate !== 'undefined')
+          ? AuthGate.isAuthError(e)
+          : (e && (e.status === 401 || e.status === 403));
+        window.adaptersError = { auth: !!isAuth, message: e.message };
+        console.error('加载 AI 适配器失败:', e);
       }
       renderAdapters();
       refreshAdapterSelect();
+      // 运行状态是逐个单体接口拉的，不阻塞列表首屏
+      loadAdapterStatuses();
     }
 
     function renderAdapters() {
       const listEl = document.getElementById('adapterList');
+      // 10 秒整页轮询会重建这块 DOM：先把用户输入与已收到的回复存下来，重建后还原，
+      // 否则打字会被定时刷新清空。
+      const keep = {};
+      listEl.querySelectorAll('textarea[id^="inline-prompt-"]').forEach(ta => {
+        const id = ta.id.replace('inline-prompt-', '');
+        keep[id] = keep[id] || {};
+        keep[id].prompt = ta.value;
+      });
+      listEl.querySelectorAll('.adapter-output').forEach(box => {
+        const id = box.id.replace('inline-output-', '');
+        keep[id] = keep[id] || {};
+        keep[id].output = box.textContent;
+        keep[id].shown = box.classList.contains('show');
+      });
+      // 失败态：优先渲染错误原因，而不是空列表伪装成"没有 AI"
+      if (window.adaptersError) {
+        if (window.adaptersError.auth) {
+          listEl.innerHTML =
+            `<span class="adapter-status-text">需要 API Key 才能读取 AI 列表</span>` +
+            `<button class="adapter-btn connect" onclick="if(typeof AuthGate!=='undefined')AuthGate.open('missing')">填入 Key</button>`;
+        } else {
+          listEl.innerHTML =
+            `<span class="adapter-status-text">读取 AI 列表失败：${escapeHtml(window.adaptersError.message || '未知错误')}</span>` +
+            `<button class="adapter-btn connect" onclick="loadAdapters()">重试</button>`;
+        }
+        return;
+      }
       if (!window.adaptersCache.length) {
         listEl.innerHTML = `<span class="adapter-status-text">未发现适配器</span>`;
         return;
@@ -1091,29 +1202,139 @@
       listEl.innerHTML = window.adaptersCache.map(a => {
         const connected = !!a.connected;
         const alive = !!a.alive;
+        // 注册表可能仍记着"已连接"，但单体 /status 已经是 offline（进程被关掉/调试端口失效）。
+        // 这种情况按不可用处理：不给绿点、不给就地发任务入口。
+        const usable = connected && a.runtime_status !== 'offline';
         let statusText = '离线';
-        if (connected) statusText = a.status || '已连接';
+        if (usable) statusText = a.runtime_status ? runtimeLabel(a.runtime_status) : (a.status || '已连接');
+        else if (connected) statusText = '连接已失效，请重新连接';
         else if (alive) statusText = '可达 · 未连接';
         // 是否给"重启并连接"入口由后端能力字段决定，不再按 ai_id 硬编码
         const canRestart = !!a.can_restart;
-        const hint = (!connected && canRestart)
+        const hint = (!usable && canRestart)
           ? (ADAPTER_RESTART_HINTS[a.ai_id] || ' 点"重启并连接"：Star 会关闭现有实例并以调试端口重启')
           : '';
+        const caps = (a.capabilities || []).map(c =>
+          `<span class="adapter-cap">${escapeHtml(c.name || c)}</span>`).join('');
+        const metaParts = [];
+        if (a.port) metaParts.push('端口 ' + a.port);
+        if (a.ai_version) metaParts.push('v' + a.ai_version);
+        const meta = metaParts.join(' · ');
         return `
-          <div class="adapter-card ${connected ? 'connected' : 'offline'}">
-            <span class="kernel-dot ${connected ? 'online' : 'offline'}"></span>
-            <div class="adapter-info">
-              <div class="adapter-name">${escapeHtml(a.ai_name || a.ai_id)}</div>
-              <div class="adapter-status-text ${(!connected && canRestart) ? 'hint' : ''}">${escapeHtml(statusText)}${escapeHtml(hint)}</div>
+          <div class="adapter-card ${usable ? 'connected' : 'offline'}">
+            <div class="adapter-head">
+              <span class="kernel-dot ${usable ? 'online' : 'offline'}"></span>
+              <div class="adapter-info">
+                <div class="adapter-name">${escapeHtml(a.ai_name || a.ai_id)}</div>
+                <div class="adapter-status-text ${(!usable && canRestart) ? 'hint' : ''}">${escapeHtml(statusText)}${escapeHtml(hint)}</div>
+              </div>
+              ${usable
+                ? `<button class="adapter-btn disconnect" onclick="disconnectAdapter('${a.ai_id}')">断开</button>`
+                : `<button class="adapter-btn connect" onclick="connectAdapter('${a.ai_id}')">连接</button>${
+                    canRestart
+                      ? `<button class="adapter-btn restart" onclick="restartAdapter('${a.ai_id}')">重启并连接</button>`
+                      : ''}`}
             </div>
-            ${connected
-              ? `<button class="adapter-btn disconnect" onclick="disconnectAdapter('${a.ai_id}')">断开</button>`
-              : `<button class="adapter-btn connect" onclick="connectAdapter('${a.ai_id}')">连接</button>${
-                  canRestart
-                    ? `<button class="adapter-btn restart" onclick="restartAdapter('${a.ai_id}')">重启并连接</button>`
-                    : ''}`}
+            ${meta ? `<div class="adapter-meta">${escapeHtml(meta)}</div>` : ''}
+            ${caps ? `<div class="adapter-caps">${caps}</div>` : ''}
+            ${usable ? `
+            <div class="adapter-inline">
+              <textarea id="inline-prompt-${a.ai_id}" placeholder="给 ${escapeHtml(a.ai_name || a.ai_id)} 发一条指令…"></textarea>
+              <div class="adapter-inline-row">
+                <button class="adapter-btn connect" onclick="sendToAdapter('${a.ai_id}')">发送</button>
+                <span class="adapter-meta" id="inline-hint-${a.ai_id}"></span>
+              </div>
+              <div class="adapter-output" id="inline-output-${a.ai_id}"></div>
+            </div>` : ''}
           </div>`;
       }).join('');
+
+      // 还原重建前的用户输入与已收到的回复
+      Object.keys(keep).forEach(id => {
+        const k = keep[id];
+        const ta = document.getElementById('inline-prompt-' + id);
+        if (ta && k.prompt) ta.value = k.prompt;
+        const box = document.getElementById('inline-output-' + id);
+        if (box && k.output) {
+          box.textContent = k.output;
+          if (k.shown) box.classList.add('show');
+        }
+      });
+    }
+
+    function runtimeLabel(status) {
+      if (status === 'generating') return '正在生成…';
+      if (status === 'idle') return '空闲 · 已连接';
+      if (status === 'offline') return '离线';
+      return '已连接';
+    }
+
+    // 列表接口不含 status，仅对已连接适配器逐个拉单体 /status；失败不阻塞渲染
+    async function loadAdapterStatuses() {
+      const targets = window.adaptersCache.filter(a => a.connected);
+      if (!targets.length) return;
+      const results = await Promise.all(targets.map(a =>
+        adapterApi.status(a.ai_id)
+          .then(s => ({ ai_id: a.ai_id, status: s.status }))
+          .catch(e => { console.error('读取适配器状态失败', a.ai_id, e); return null; })
+      ));
+      let changed = false;
+      results.filter(Boolean).forEach(r => {
+        const a = window.adaptersCache.find(x => x.ai_id === r.ai_id);
+        if (a && a.runtime_status !== r.status) { a.runtime_status = r.status; changed = true; }
+      });
+      if (changed) renderAdapters();
+    }
+
+    // 就地发任务：适配器无关，走通用 createTask + 轮询 output
+    const _inlinePollTimers = {};
+    async function sendToAdapter(aiId) {
+      const ta = document.getElementById('inline-prompt-' + aiId);
+      const box = document.getElementById('inline-output-' + aiId);
+      const prompt = (ta && ta.value || '').trim();
+      if (!prompt) { showNotification('请输入指令内容', 'error'); return; }
+      box.classList.add('show');
+      box.textContent = '发送中…';
+      try {
+        const res = await adapterApi.createTask(aiId, prompt, { taskType: 'work' });
+        if (!res.success) { box.textContent = '发送失败：' + (res.message || '未知错误'); return; }
+        box.textContent = '已发送，等待回复…';
+        pollAdapterOutput(aiId, res.conversation_id);
+      } catch (e) {
+        // 503 = 未连接；401 由 AuthGate 兜底
+        box.textContent = (e.status === 503)
+          ? '适配器未连接，请先点"连接"或"重启并连接"'
+          : '发送失败：' + e.message;
+      }
+    }
+
+    // 轮询取回复：2s 一次、40s 上限、失败只记一次。
+    // 每次按 id 重新取 box：定时刷新会重建卡片 DOM，闭包里的旧引用会失效。
+    function pollAdapterOutput(aiId, convId) {
+      if (_inlinePollTimers[aiId]) clearInterval(_inlinePollTimers[aiId]);
+      let lastLen = 0;
+      let elapsed = 0;
+      let errLogged = false;
+      _inlinePollTimers[aiId] = setInterval(async () => {
+        elapsed += 2;
+        const box = document.getElementById('inline-output-' + aiId);
+        try {
+          const res = await adapterApi.getOutput(aiId, convId, 500);
+          if (box && res && res.found && res.content) {
+            box.classList.add('show');
+            box.textContent = res.content;   // 全量覆盖，保持顺序
+            box.scrollTop = box.scrollHeight;
+            lastLen = res.content.length;
+          }
+        } catch (e) {
+          if (!errLogged) { errLogged = true; console.error('读取回复失败', aiId, e); }
+        }
+        if (elapsed >= 40) {
+          clearInterval(_inlinePollTimers[aiId]);
+          _inlinePollTimers[aiId] = null;
+          if (lastLen === 0 && box) box.textContent = '仍无回复，可能任务较长，请到对应 AI 窗口查看';
+        }
+      }, 2000);
     }
 
     async function connectAdapter(aiId) {
@@ -1134,7 +1355,10 @@
     async function disconnectAdapter(aiId) {
       try {
         await adapterApi.disconnect(aiId);
-      } catch (e) {}
+        showNotification('已断开 ' + aiId, 'success');
+      } catch (e) {
+        showNotification('断开失败: ' + e.message, 'error');
+      }
       await loadAdapters();
     }
 
@@ -1204,7 +1428,10 @@
           opt.textContent = ws.name + ' (' + ws.path + ')';
           select.appendChild(opt);
         });
-      } catch (e) {}
+      } catch (e) {
+        // 工作目录是可选项，鉴权失败由 AuthGate 统一引导，这里只记日志不打断主流程
+        console.error('加载工作目录失败:', e);
+      }
     }
 
     // ===== 任务列表 =====
@@ -1429,11 +1656,19 @@
     }
 
     // ===== SSE 会话流式监听 =====
-    function connectSessionStream(conversationId) {
+    async function connectSessionStream(conversationId) {
       if (sessionEventSource) {
         sessionEventSource.close();
       }
-      sessionEventSource = new EventSource(dumateApi.streamSessionUrl(conversationId));
+      let url;
+      try {
+        url = await dumateApi.streamSessionUrl(conversationId);
+      } catch (err) {
+        // 鉴权失败交给 AuthGate 引导；会话流本来就不自动重连
+        console.error('会话流票据获取失败:', err);
+        return;
+      }
+      sessionEventSource = new EventSource(url);
       sessionEventSource.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
@@ -1447,7 +1682,9 @@
             // 任务完成，刷新列表
             refreshTasks();
           }
-        } catch (e) {}
+        } catch (e) {
+          console.error('会话事件解析失败:', e, event.data);
+        }
       };
       sessionEventSource.onerror = () => {
         if (sessionEventSource) {
@@ -1624,6 +1861,7 @@
       if (_popupPollTimer) clearInterval(_popupPollTimer);
       let lastLen = 0;
       let elapsed = 0;
+      let pollErrorLogged = false;   // 轮询失败只记一次，避免每 2 秒刷屏
       _popupPollTimer = setInterval(async () => {
         elapsed += 2;
         try {
@@ -1636,7 +1874,12 @@
               box.textContent = box.textContent + '\n' + newText;
             }
           }
-        } catch (e) {}
+        } catch (e) {
+          if (!pollErrorLogged) {
+            pollErrorLogged = true;
+            console.error('读取任务输出失败:', e);
+          }
+        }
         if (elapsed >= 40) { clearInterval(_popupPollTimer); _popupPollTimer = null; }
       }, 2000);
     }

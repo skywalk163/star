@@ -659,6 +659,11 @@ async def get_task_log(task_id: str):
 
 
 # ==================== 路由：SSE 流式响应 ====================
+#
+# 这两个端点的鉴权不在此处：它们是 GET，走 router 级的 require_by_method，
+# 那里已经支持「没带 X-API-Key 时用 ticket query 参数」作为回退——
+# 浏览器原生 EventSource 设不了请求头，只能这么过。
+# 不要在函数体内再补一层校验：router 级依赖先执行，写在这里的检查永远轮不到。
 
 
 @router.get("/stream")

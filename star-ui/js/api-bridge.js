@@ -7,15 +7,22 @@ const API_BASE = '';
 const WS_URL = `${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}/ws/starlight`;
 
 // ==================== REST API ====================
-let _apiKey = localStorage.getItem('star_api_key') || '';
+let _apiKey = '';
+try {
+  _apiKey = localStorage.getItem('star_api_key') || '';
+} catch (e) {
+  // 隐私模式下 localStorage 不可用：Key 退化为内存态，本次会话仍可用
+}
 
 function setApiKey(key) {
   _apiKey = key || '';
-  if (key) {
-    localStorage.setItem('star_api_key', key);
-  } else {
-    localStorage.removeItem('star_api_key');
-  }
+  try {
+    if (key) {
+      localStorage.setItem('star_api_key', key);
+    } else {
+      localStorage.removeItem('star_api_key');
+    }
+  } catch (e) { /* 同上：仅内存态 */ }
 }
 
 function getApiKey() {
@@ -35,6 +42,12 @@ async function apiFetch(path, options = {}) {
   if (!res.ok) {
     const err = new Error(`${res.status} ${res.statusText}`);
     err.status = res.status;   // 便于调用方区分 401（缺 Key）和其它失败
+    // 鉴权失败统一广播，由 auth-gate.js 兜底做引导；页面只负责画自己的失败态。
+    if (res.status === 401 || res.status === 403) {
+      window.dispatchEvent(new CustomEvent('star:unauthorized', {
+        detail: { path, status: res.status },
+      }));
+    }
     throw err;
   }
   return res.json();
@@ -89,6 +102,26 @@ const configApi = {
   update: (data) => apiFetch('/api/config', { method: 'PUT', body: JSON.stringify(data) }),
 };
 
+// ==================== 流式连接票据（SSE / WebSocket） ====================
+//
+// 浏览器原生 EventSource / WebSocket 都设不了 X-API-Key 请求头，所以先用带 header 的
+// apiFetch 换一张短时一次性票据，票据再随 query 参数进连接 URL。
+// 详见后端 star_api/auth.py 的「流式连接票据」一节。
+
+// 取一张一次性流式票据。
+// 鉴权未启用时后端返回空票据（ticket:''），调用方拿到 '' 原样使用即可，不必特判。
+// 401/403 由 apiFetch 广播 star:unauthorized，同时向上抛给调用方决定是否重连。
+async function getStreamTicket() {
+  const data = await apiFetch('/api/auth/stream-ticket', { method: 'POST' });
+  return (data && data.ticket) || '';
+}
+
+// 给流式 URL 附加票据。票据为空（鉴权未开）时原样返回。
+function appendStreamTicket(url, ticket) {
+  if (!ticket) return url;
+  return url + (url.includes('?') ? '&' : '?') + 'ticket=' + encodeURIComponent(ticket);
+}
+
 // ==================== WebSocket 星光流 ====================
 let ws = null;
 let wsConnected = false;
@@ -98,8 +131,20 @@ let wsCallbacks = {};
 function connectWebSocket(handlers) {
   wsCallbacks = handlers || {};
   if (ws) ws.close();
-  ws = new WebSocket(WS_URL);
+  // 票据用后即焚，所以每次连接（含每次重连）都必须重新取，不能缓存复用
+  getStreamTicket().then(ticket => {
+    ws = new WebSocket(appendStreamTicket(WS_URL, ticket));
+    bindWsHandlers();
+  }).catch(err => {
+    // 401/403：apiFetch 已广播 star:unauthorized，交给 AuthGate 引导补 Key。
+    // 此时重连只是空转，等 AuthGate 拿到 Key 后由页面重新调用。
+    if (err && (err.status === 401 || err.status === 403)) return;
+    // 其它失败（服务刚起、网络抖动）沿用既有重连节奏
+    setTimeout(() => connectWebSocket(wsCallbacks), 5000);
+  });
+}
 
+function bindWsHandlers() {
   ws.onopen = () => {
     wsConnected = true;
     if (wsCallbacks.onConnected) wsCallbacks.onConnected();
@@ -167,17 +212,25 @@ function connectOcrStream(starId, handlers, interval = 3) {
   if (ocrWs) ocrWs.close();
   ocrWsCallbacks = handlers || {};
   const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-  ocrWs = new WebSocket(`${protocol}//${location.host}/ws/ocr/${starId}?interval=${interval}`);
-  ocrWs.onopen = () => { if (ocrWsCallbacks.onOpen) ocrWsCallbacks.onOpen(); };
-  ocrWs.onmessage = (event) => {
-    try {
-      const msg = JSON.parse(event.data);
-      if (msg.type === 'ocr_update' && ocrWsCallbacks.onOcrUpdate) ocrWsCallbacks.onOcrUpdate(msg.data);
-      else if (msg.type === 'connected' && ocrWsCallbacks.onConnected) ocrWsCallbacks.onConnected(msg);
-    } catch(e) {}
-  };
-  ocrWs.onclose = () => { if (ocrWsCallbacks.onClose) ocrWsCallbacks.onClose(); };
-  ocrWs.onerror = () => {};
+  const baseUrl = `${protocol}//${location.host}/ws/ocr/${starId}?interval=${interval}`;
+  // 每次连接重新取票据（一次性，重连不可复用）
+  getStreamTicket().then(ticket => {
+    ocrWs = new WebSocket(appendStreamTicket(baseUrl, ticket));
+    ocrWs.onopen = () => { if (ocrWsCallbacks.onOpen) ocrWsCallbacks.onOpen(); };
+    ocrWs.onmessage = (event) => {
+      try {
+        const msg = JSON.parse(event.data);
+        if (msg.type === 'ocr_update' && ocrWsCallbacks.onOcrUpdate) ocrWsCallbacks.onOcrUpdate(msg.data);
+        else if (msg.type === 'connected' && ocrWsCallbacks.onConnected) ocrWsCallbacks.onConnected(msg);
+      } catch(e) {}
+    };
+    ocrWs.onclose = () => { if (ocrWsCallbacks.onClose) ocrWsCallbacks.onClose(); };
+    ocrWs.onerror = () => {};
+  }).catch(err => {
+    // 401/403 已由 apiFetch 广播；OCR 流不自动重连，交给调用方在补 Key 后重新发起
+    if (err && (err.status === 401 || err.status === 403)) return;
+    if (ocrWsCallbacks.onClose) ocrWsCallbacks.onClose();
+  });
 }
 
 function disconnectOcrStream() {
@@ -300,8 +353,12 @@ const workApi = {
   listTasks: () => apiFetch('/api/work/tasks'),
   getTask: (taskId) => apiFetch('/api/work/tasks/' + taskId),
   getTaskScript: (taskId, scriptName) => apiFetch('/api/work/tasks/' + taskId + '/script/' + scriptName),
+  // @deprecated 后端 /api/work/ai 依赖从未赋值的 state.emissaries，恒返回空列表。
+  // 请改用 adapterApi.list()（/api/dumate/adapters，AIAdapterRegistry 的唯一投影）。
   listAIs: () => apiFetch('/api/work/ai'),
   getAIStatus: (aiId) => apiFetch('/api/work/ai/' + aiId + '/status'),
+  // @deprecated 后端 POST /api/work/ai/{id}/ask 签名不匹配（await 同步方法 + 多传 adapter_name），必然 TypeError。
+  // 请改用 adapterApi.createTask() + adapterApi.getOutput() 轮询。
   askAI: (aiId, data) => apiFetch('/api/work/ai/' + aiId + '/ask', {
     method: 'POST',
     body: JSON.stringify(data),
@@ -339,9 +396,11 @@ const dumateApi = {
   // 会话输出内容（实时轮询）
   getConversationOutput: (convId, maxLines) =>
     apiFetch(`/api/dumate/conversations/${convId}/output?max_lines=${maxLines || 200}`),
-  // SSE 事件流
-  streamUrl: () => '/api/dumate/stream',
-  streamSessionUrl: (convId) => '/api/dumate/stream/session/' + convId,
+  // SSE 事件流。EventSource 设不了请求头，URL 里必须带一次性票据；
+  // 票据用后即焚，所以这两个函数是 async 的，每次（重）连都会重新取一张。
+  streamUrl: async () => appendStreamTicket('/api/dumate/stream', await getStreamTicket()),
+  streamSessionUrl: async (convId) =>
+    appendStreamTicket('/api/dumate/stream/session/' + convId, await getStreamTicket()),
 };
 
 // ==================== Adapter API (统一 AI 适配器) ====================

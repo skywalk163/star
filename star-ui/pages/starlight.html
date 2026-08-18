@@ -136,6 +136,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.3.1/dist/index.global.js"></script>
     <script src="https://unpkg.com/lucide@1.8.0/dist/umd/lucide.min.js"></script>
     <script src="/ui/js/api-bridge.js"></script>
+    <script src="/ui/js/auth-gate.js"></script>
     <script src="/ui/js/nav.js"></script>
     <script src="/ui/js/onboarding.js"></script>
     <style type="text/tailwindcss">
@@ -317,12 +318,25 @@
         background-color: currentColor;
       }
     </style>
+
+    <!-- 窄屏（手机）适配：与 Tailwind 的 md 断点(768px)对齐 -->
+    <style>
+      @media (max-width: 768px) {
+        /* main 上的 h-screen + overflow-hidden 让窄屏内容超一屏后无法滚动。
+           观星历史时间轴本身已有 overflow-x-auto，可横滑，不需要额外处理 */
+        main.flex {
+          height: auto !important;
+          min-height: calc(100vh - 56px - env(safe-area-inset-bottom, 0px));
+          overflow: visible !important;
+        }
+      }
+    </style>
 </head>
 <body class="min-h-screen font-sans antialiased" style="background-color:var(--color-bg-deep);color:var(--color-text-primary);">
     <main class="flex h-screen overflow-hidden">
 
         <!-- ====== SIDEBAR ====== -->
-        <aside class="w-[60px] flex-shrink-0 flex flex-col items-center py-4 h-full" style="background-color:var(--color-bg-panel);border-right:1px solid var(--color-border);">
+        <aside class="hidden md:flex w-[60px] flex-shrink-0 flex-col items-center py-4 h-full" style="background-color:var(--color-bg-panel);border-right:1px solid var(--color-border);">
             <!-- Logo -->
             <div class="flex items-center justify-center w-10 h-10 mb-8 text-xl" style="color:var(--color-primary);font-weight:700;">
                 ★

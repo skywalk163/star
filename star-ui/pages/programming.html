@@ -28,6 +28,9 @@
 }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.3.1/dist/index.global.js"></script>
+    <script src="/ui/js/api-bridge.js"></script>
+    <script src="/ui/js/auth-gate.js"></script>
+    <script src="/ui/js/nav.js"></script>
     <script src="/ui/js/programming-store.js"></script>
     <script src="/ui/js/context-reader.js"></script>
     <style>
@@ -329,6 +332,17 @@
       }
       .compare-stats .add-count { color: #34d399; }
       .compare-stats .remove-count { color: #f87171; }
+
+      /* ===== 窄屏（手机）适配 ===== */
+      @media (max-width: 768px) {
+        /* 260px 的 flex 侧栏不收缩，窄屏会挤爆主区；导航交给底部 tab bar */
+        .sidebar { display: none; }
+        /* 多个 min-width:300px 的 AI 面板并排必横向溢出，窄屏改为纵向堆叠 */
+        .workspace { flex-direction: column; overflow-y: auto; }
+        .ai-panel { min-width: 0; min-height: 320px; }
+        /* 触控目标：原 padding 撑出约 34px，不足 44px */
+        .send-btn { min-height: 44px; }
+      }
     </style>
 </head>
 <body>

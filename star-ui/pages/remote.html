@@ -37,6 +37,8 @@
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.3.1/dist/index.global.js"></script>
     <script src="https://unpkg.com/lucide@1.8.0/dist/umd/lucide.min.js"></script>
     <script src="/ui/js/api-bridge.js"></script>
+    <script src="/ui/js/auth-gate.js"></script>
+    <script src="/ui/js/nav.js"></script>
     <style>
       * { box-sizing: border-box; margin: 0; padding: 0; }
       body {
@@ -311,6 +313,15 @@
         animation: spin 0.8s linear infinite;
       }
       @keyframes spin { to { transform: rotate(360deg); } }
+
+      /* ===== 窄屏（手机）适配 ===== */
+      @media (max-width: 768px) {
+        /* 280px 的 flex 侧栏不收缩，窄屏会把主区压到 100px 以内；导航交给底部 tab bar */
+        .sidebar { display: none; }
+        /* 原本 height:100vh + overflow:hidden，窄屏内容超一屏就没法滚了 */
+        body { height: auto; min-height: 100vh; overflow-y: auto; }
+        .app { height: auto; min-height: 100vh; }
+      }
     </style>
 </head>
 <body>
@@ -771,7 +782,9 @@
           document.getElementById('intervalValue').textContent = formatInterval(status.current_interval);
           document.getElementById('lastUpdate').textContent = formatAgo(status.last_screenshot_time);
           document.getElementById('noChangeCount').textContent = status.no_change_count;
-        } catch (e) {}
+        } catch (e) {
+          console.error('读取截图状态失败:', e);
+        }
       }
 
       function scheduleNextRefresh() {
@@ -781,7 +794,8 @@
         remoteApi.getScreenshotStatus(currentHwnd).then(status => {
           const interval = (status.current_interval || 60) * 1000;
           refreshTimer = setTimeout(() => loadScreenshot(false), interval);
-        }).catch(() => {
+        }).catch(e => {
+          console.error('读取刷新间隔失败，退回 60s 轮询:', e);
           refreshTimer = setTimeout(() => loadScreenshot(false), 60000);
         });
       }
@@ -1040,7 +1054,9 @@
             showNotification('API Key 无效，请重新设置', 'warning');
           }
           updateAuthBadge(status);
-        } catch (e) {}
+        } catch (e) {
+          console.error('读取鉴权状态失败:', e);
+        }
       }
 
       function updateAuthBadge(status) {
@@ -1174,7 +1190,9 @@
           if (el && stats) {
             el.textContent = '共 ' + stats.total_entries + ' 条日志 | ' + (Object.keys(stats.operations || {}).length) + ' 种操作类型';
           }
-        } catch (e) {}
+        } catch (e) {
+          console.error('读取审计统计失败:', e);
+        }
       }
     </script>
 </body>

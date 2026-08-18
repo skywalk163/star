@@ -27,6 +27,9 @@
 }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.3.1/dist/index.global.js"></script>
+    <script src="/ui/js/api-bridge.js"></script>
+    <script src="/ui/js/auth-gate.js"></script>
+    <script src="/ui/js/nav.js"></script>
     <script src="/ui/js/template-service.js"></script>
     <style>
       * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -175,6 +178,14 @@
         color: var(--color-text-muted);
         margin-top: 4px;
       }
+
+      /* ===== 窄屏（手机）适配 ===== */
+      @media (max-width: 768px) {
+        body { padding: 12px; }
+        .template-select select { min-width: 0; width: 100%; }
+        /* minmax(280px,1fr) 在 375px 屏减去 padding 后放不下，强制单列 */
+        .results-grid { grid-template-columns: 1fr; }
+      }
     </style>
 </head>
 <body>
@@ -215,14 +226,18 @@
     <script>
         let hwids = [];
         let starsInfo = [];
+        let starsLoadError = null;   // 读取 AI 列表失败的原因，供渲染失败态用
 
         async function init() {
             const params = new URLSearchParams(window.location.search);
             hwids = (params.get('hwids') || '').split(',').filter(h => h).map(Number);
             
             if (hwids.length === 0) {
-                alert('没有选择任何 AI');
-                window.close();
+                const container = document.getElementById('selectedStars');
+                if (container) container.textContent = '没有选择任何 AI，请回到星群页面重新选择';
+                if (typeof showNotification === 'function') {
+                    showNotification('没有选择任何 AI', 'error');
+                }
                 return;
             }
 
@@ -257,9 +272,10 @@
 
         async function loadStarsInfo() {
             try {
-                const resp = await fetch('/api/remote/stars/status');
-                const data = await resp.json();
-                
+                // 走 apiFetch：自动带 X-API-Key，401 会由 auth-gate 统一引导
+                const data = await apiFetch('/api/remote/stars/status');
+                starsLoadError = null;
+
                 if (data.success) {
                     starsInfo = [];
                     for (const star of data.stars) {
@@ -277,11 +293,29 @@
                 }
             } catch (err) {
                 console.error('Failed to load stars info:', err);
+                const isAuth = (typeof AuthGate !== 'undefined')
+                    ? AuthGate.isAuthError(err)
+                    : (err && (err.status === 401 || err.status === 403));
+                starsLoadError = isAuth
+                    ? '需要 API Key 才能读取 AI 列表'
+                    : '读取 AI 列表失败：' + err.message;
+                if (!isAuth && typeof showNotification === 'function') {
+                    showNotification(starsLoadError, 'error');
+                }
             }
         }
 
         function renderSelectedStars() {
             const container = document.getElementById('selectedStars');
+            if (starsLoadError) {
+                container.innerHTML = `<span style="color:var(--state-warning,#d97706);">${starsLoadError}</span>` +
+                    (typeof AuthGate !== 'undefined'
+                        ? ` <button type="button" onclick="AuthGate.open('missing')"
+                              style="min-height:32px;padding:4px 12px;margin-left:8px;border:1px solid var(--color-border,#2a2f3a);
+                              border-radius:6px;background:transparent;color:inherit;cursor:pointer;">填入 API Key</button>`
+                        : '');
+                return;
+            }
             container.innerHTML = starsInfo.map(s => `
                 <span class="star-chip">
                     <span style="width:6px;height:6px;border-radius:50%;background:var(--color-primary);"></span>
@@ -293,7 +327,11 @@
         async function sendCommands() {
             const text = document.getElementById('commandInput').value.trim();
             if (!text) {
-                alert('请输入指令内容');
+                if (typeof showNotification === 'function') {
+                    showNotification('请输入指令内容', 'error');
+                } else {
+                    alert('请输入指令内容');
+                }
                 return;
             }
 
@@ -321,18 +359,16 @@
                 body.textContent = '正在发送...';
 
                 try {
-                    const resp = await fetch('/api/remote/broadcast/send', {
+                    // 走 apiFetch：自动带 X-API-Key，写操作 401/403 会由 auth-gate 统一引导
+                    const result = await apiFetch('/api/remote/broadcast/send', {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
                             hwids: [star.hwnd],
                             text: text,
                             parallel: false
                         })
                     });
-                    
-                    const result = await resp.json();
-                    
+
                     if (result.success && result.results?.[0]?.success) {
                         statusDot.className = 'result-status completed';
                         body.textContent = '指令已发送，等待响应...';

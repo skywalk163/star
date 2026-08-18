@@ -38,6 +38,8 @@
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.3.1/dist/index.global.js"></script>
     <script src="https://unpkg.com/lucide@1.8.0/dist/umd/lucide.min.js"></script>
     <script src="/ui/js/api-bridge.js"></script>
+    <script src="/ui/js/auth-gate.js"></script>
+    <script src="/ui/js/nav.js"></script>
     <style>
       * { box-sizing: border-box; margin: 0; padding: 0; }
       body {
@@ -362,6 +364,12 @@
         text-align: center;
         margin-top: var(--space-xl);
       }
+
+      /* ===== 窄屏（手机）适配 ===== */
+      @media (max-width: 768px) {
+        /* minmax(380px,1fr) 在 375px 屏必溢出，强制单列 */
+        .stars-grid { grid-template-columns: 1fr; }
+      }
     </style>
 </head>
 <body>
@@ -504,11 +512,14 @@
                 }
             } catch (err) {
                 console.error('Failed to fetch stars status:', err);
-                const needKey = String(err.message || '').startsWith('401');
+                // 401/403 统一按 err.status 判定，引导由 AuthGate 的提示条/浮层负责
+                const needKey = (typeof AuthGate !== 'undefined')
+                    ? AuthGate.isAuthError(err)
+                    : (err && (err.status === 401 || err.status === 403));
                 document.getElementById('starsGrid').innerHTML = `
                     <div class="empty-state">
                         <div class="icon"><i data-icon="alert-circle"></i></div>
-                        <div class="text">${needKey ? '需要在“遥控台”页面设置 API Key 后才能查看星群状态' : '无法连接到服务器'}</div>
+                        <div class="text">${needKey ? '需要 API Key 才能查看星群状态' : '无法连接到服务器'}</div>
                     </div>
                 `;
                 if (typeof lucide !== 'undefined') lucide.createIcons();

@@ -136,6 +136,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.3.1/dist/index.global.js"></script>
     <script src="https://unpkg.com/lucide@1.8.0/dist/umd/lucide.min.js"></script>
     <script src="/ui/js/api-bridge.js"></script>
+    <script src="/ui/js/auth-gate.js"></script>
     <script src="/ui/js/onboarding.js"></script>
     <script src="/ui/js/nav.js"></script>
     <style type="text/tailwindcss">
@@ -170,7 +171,7 @@
     <main class="flex h-screen">
 
       <!-- ===== SIDEBAR ===== -->
-      <aside class="flex flex-col items-center w-[60px] shrink-0 border-r" style="background:var(--color-bg-panel);border-color:var(--color-border);">
+      <aside class="hidden md:flex flex-col items-center w-[60px] shrink-0 border-r" style="background:var(--color-bg-panel);border-color:var(--color-border);">
         <!-- Logo -->
         <div class="flex items-center justify-center w-full h-[56px] border-b" style="border-color:var(--color-border);">
           <span class="text-2xl font-bold" style="color:#ffd700;">&#9733;</span>
@@ -681,6 +682,22 @@
         .star-field-overlay::before,
         .star-field-overlay::after { display: none; }
       }
+
+      /* ===== 窄屏（手机）适配 ===== */
+      @media (max-width: 768px) {
+        /* h-screen 是满屏高，加上 body 为 tab bar 留的 padding 会多出 56px 滚动条 */
+        main.flex { height: calc(100vh - 56px - env(safe-area-inset-bottom, 0px)); }
+        /* 420px 的详情栏在窄屏放不下，展开时改为覆盖全屏；
+           bottom 留出底部 tab bar 的位置，保证导航仍可点 */
+        #detail-panel:not(.hidden) {
+          position: fixed;
+          top: 0; left: 0; right: 0;
+          bottom: calc(56px + env(safe-area-inset-bottom, 0px));
+          width: 100%;
+          z-index: 8400;          /* 低于 tab bar 8500，导航不被盖住 */
+          border-left: none;
+        }
+      }
     </style>
 
     <script>lucide.createIcons();</script>
@@ -792,7 +809,7 @@
       let typeEntries = [];
       
       try {
-        const typesRes = await starApi.types().catch(() => null);
+        const typesRes = await starApi.types();
         if (typesRes && (typesRes.types || typesRes.data)) {
           const typeList = typesRes.types || typesRes.data || [];
           typeEntries = typeList.map(t => {
@@ -800,7 +817,10 @@
             return [t.name || t.type || 'Unknown', t.count || 0];
           });
         }
-      } catch(e) {}
+      } catch(e) {
+        // 类型清单拿不到时退化为按已加载星体现算，只记日志不阻塞渲染
+        console.error('加载星体类型失败:', e);
+      }
       
       if (typeEntries.length === 0 || typeEntries.every(([,c]) => c === 0)) {
         const typeMap = {};
@@ -947,6 +967,10 @@
       const listView = document.getElementById('list-view');
 
       if (filtered.length === 0) {
+        // 复位为「真的没有星体」文案，覆盖上一次可能残留的失败态
+        if (emptyState) emptyState.innerHTML =
+          '<i data-lucide="stars" class="w-12 h-12 mx-auto mb-3 opacity-40"></i>' +
+          '<p class="text-sm">暂无匹配的星体</p>';
         if (emptyState) emptyState.classList.remove('hidden');
         if (cardView) cardView.innerHTML = '';
         if (listView) {
@@ -1030,17 +1054,43 @@
     }
 
     // ===== 加载星体数据 =====
+    // 加载失败时把失败原因画出来，而不是渲染一张「宇宙里什么都没有」的空星图
+    function showStarLoadError(err) {
+      const isAuth = (typeof AuthGate !== 'undefined')
+        ? AuthGate.isAuthError(err)
+        : (err && (err.status === 401 || err.status === 403));
+      const emptyState = document.getElementById('empty-state');
+      const cardView = document.getElementById('card-view');
+      const tbody = document.getElementById('list-tbody');
+      if (cardView) cardView.innerHTML = '';
+      if (tbody) tbody.innerHTML = '';
+      if (!emptyState) return;
+      emptyState.innerHTML = isAuth
+        ? `<p class="text-sm">需要 API Key 才能读取星图数据</p>
+           <button type="button" onclick="if(typeof AuthGate!=='undefined')AuthGate.open('missing')"
+                   class="mt-3 px-4 py-2 text-sm rounded-lg border"
+                   style="min-height:44px;border-color:var(--color-border);color:var(--color-text-secondary);">填入 API Key</button>`
+        : `<p class="text-sm">加载星图失败：${escapeHtml((err && err.message) || '未知错误')}</p>
+           <button type="button" onclick="loadStarMapData()"
+                   class="mt-3 px-4 py-2 text-sm rounded-lg border"
+                   style="min-height:44px;border-color:var(--color-border);color:var(--color-text-secondary);">重试</button>`;
+      emptyState.classList.remove('hidden');
+    }
+
     async function loadStarMapData() {
       triggerRefreshSpin();
       try {
-        const starsRes = await starApi.list().catch(() => ({ stars: [] }));
+        const starsRes = await starApi.list();
         allStars = starsRes.stars || [];
 
         updateStats();
         await updateTypeDropdown();
         renderStars();
       } catch(e) {
-        console.warn('StarMap API load failed:', e);
+        console.error('加载星图失败:', e);
+        allStars = [];
+        updateStats();
+        showStarLoadError(e);
       }
     }
     
@@ -1176,8 +1226,8 @@
         if (tab === 'info') {
           // 信息 Tab — 显示星体状态 + 响应来源 + 日志统计
           const [statusRes, logsRes] = await Promise.all([
-            emissaryApi.status(star.pid).catch(() => ({})),
-            emissaryApi.logs(star.pid).catch(() => ({ count: 0, files: [] })),
+            emissaryApi.status(star.pid).catch(e => { console.error('读取星体状态失败:', e); return {}; }),
+            emissaryApi.logs(star.pid).catch(e => { console.error('读取日志清单失败:', e); return { count: 0, files: [] }; }),
           ]);
           
           const status = statusRes.status || 'unknown';
@@ -1258,7 +1308,7 @@
               opt.value = a.name; opt.textContent = a.name;
               sel.appendChild(opt);
             });
-          }).catch(() => {});
+          }).catch(e => { console.error('读取适配器清单失败:', e); });
           
           // 绑定 ⚡发送 按钮
           document.getElementById('btn-send-fast').onclick = async () => {
@@ -1311,8 +1361,8 @@
           
           try {
             const [logsRes, recentRes] = await Promise.all([
-              emissaryApi.logs(star.pid).catch(() => ({ count: 0, files: [] })),
-              emissaryApi.logRecent(star.pid, 30).catch(() => ({})),
+              emissaryApi.logs(star.pid).catch(e => { console.error('读取日志清单失败:', e); return { count: 0, files: [] }; }),
+              emissaryApi.logRecent(star.pid, 30).catch(e => { console.error('读取最近日志失败:', e); return {}; }),
             ]);
             
             const logCount = logsRes.count || 0;
@@ -1359,7 +1409,7 @@
           lucide.createIcons();
           
           try {
-            const res = await emissaryApi.history(star.pid, 20).catch(() => ({ history: [] }));
+            const res = await emissaryApi.history(star.pid, 20).catch(e => { console.error('读取历史失败:', e); return { history: [] }; });
             const history = res.history || [];
             
             if (history.length === 0) {
@@ -1393,7 +1443,10 @@
       const sourceLabel = source === '⚡' ? '⚡ 日志' : (source === '📷' ? '📷 OCR' : source);
       metaDiv.innerHTML = '<span>来源: ' + sourceLabel + '</span><span>耗时: ' + duration.toFixed(1) + 's</span>';
       document.getElementById('btn-copy-response').onclick = () => {
-        navigator.clipboard.writeText(text).then(() => showNotification('已复制', 'success', 1500)).catch(() => {});
+        navigator.clipboard.writeText(text).then(() => showNotification('已复制', 'success', 1500)).catch(e => {
+          console.error('复制失败:', e);
+          showNotification('复制失败，请手动选择文本', 'error');
+        });
       };
       loadStarMapData(); // 刷新星体列表
     }

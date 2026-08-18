@@ -498,6 +498,18 @@
       justify-content: center;
       font-family: var(--font-display);
     }
+
+    /* ===== 窄屏（手机）适配 ===== */
+    @media (max-width: 768px) {
+      /* 240px 的 fixed 侧栏在窄屏会浮在内容上，导航已交给底部 tab bar */
+      .sidebar { display: none; }
+      .main { margin-left: 0; padding: 16px; }
+      .grid-2 { grid-template-columns: 1fr; }
+      /* 帮助按钮原本贴在 bottom:24px，会被底部 tab bar 压住，抬到 tab bar 之上 */
+      #onboarding-help-btn {
+        bottom: calc(56px + 16px + env(safe-area-inset-bottom, 0px));
+      }
+    }
   </style>
 </head>
 <body>
@@ -617,6 +629,7 @@
 
   <script src="https://unpkg.com/lucide@1.8.0/dist/umd/lucide.min.js"></script>
   <script src="/ui/js/api-bridge.js"></script>
+  <script src="/ui/js/auth-gate.js"></script>
   <script src="/ui/js/nav.js"></script>
   <script src="/ui/js/onboarding.js"></script>
   <script>
@@ -629,42 +642,56 @@
 
     // 初始化
     async function init() {
+      // 填完 Key 后就地重新拉数据，不整页 reload
+      if (typeof AuthGate !== 'undefined') {
+        AuthGate.onAuthorized(() => { refreshAIs(); loadTasks(); });
+      }
       await Promise.all([refreshAIs(), loadTasks()]);
       updateSendButton();
     }
 
     // 刷新 AI 列表
+    // 数据源与 Agents 总览页同源：/api/dumate/adapters（AIAdapterRegistry 的投影）
     async function refreshAIs() {
       const container = document.getElementById('aiList');
       container.innerHTML = '<div class="skeleton skeleton-card"></div><div class="skeleton skeleton-card"></div>';
 
       try {
-        const data = await workApi.listAIs();
-        aiList = data.ais || [];
+        const data = await adapterApi.list();
+        aiList = (data.adapters || []).map(a => ({
+          ai_id: a.ai_id,
+          name: a.ai_name || a.ai_id,
+          type: a.ai_id,
+          connected: !!a.connected,
+          alive: !!a.alive,
+          status: a.connected ? 'running' : 'idle',
+          uptime: a.port ? ('端口 ' + a.port) : '',
+        }));
 
         if (aiList.length === 0) {
           container.innerHTML = `
             <div class="empty-state">
               <i data-lucide="cpu"></i>
-              <p>暂未发现运行的 AI Agent</p>
-              <p style="margin-top: 8px; font-size: 11px;">请先启动 Trae 或其他 AI 软件</p>
+              <p>暂未发现可用的 AI Agent</p>
+              <p style="margin-top: 8px; font-size: 11px;">到 <a href="/ui/pages/dumate.html">Agents 总览</a> 连接 Trae / DuMate</p>
             </div>
           `;
           lucide.createIcons();
+          updateAISelect();
           return;
         }
 
         container.innerHTML = aiList.map(ai => `
           <div class="ai-card" onclick="selectAI('${ai.ai_id}')" data-id="${ai.ai_id}">
-            <div class="ai-avatar">${getAIIcon(ai.type)}</div>
+            <div class="ai-avatar">${getAIIcon(ai.ai_id)}</div>
             <div class="ai-info">
-              <div class="ai-name">${ai.name}</div>
+              <div class="ai-name">${escapeHtml(ai.name)}</div>
               <div class="ai-meta">
                 <span class="ai-status ${ai.status}">
                   <span class="ai-status-dot"></span>
-                  ${ai.status === 'running' ? '运行中' : ai.status === 'busy' ? '忙碌中' : '空闲'}
+                  ${ai.connected ? '已连接' : (ai.alive ? '可达 · 未连接' : '离线')}
                 </span>
-                ${ai.uptime ? '<span>' + ai.uptime + '</span>' : ''}
+                ${ai.uptime ? '<span>' + escapeHtml(ai.uptime) + '</span>' : ''}
               </div>
             </div>
           </div>
@@ -674,25 +701,35 @@
         updateAISelect();
 
       } catch (err) {
-        container.innerHTML = `
-          <div class="empty-state">
-            <i data-lucide="alert-circle"></i>
-            <p>加载失败: ${err.message}</p>
-          </div>
-        `;
+        // 鉴权失败交给 AuthGate 引导，不再伪装成"暂未发现 AI"
+        const isAuth = (typeof AuthGate !== 'undefined')
+          ? AuthGate.isAuthError(err)
+          : (err && (err.status === 401 || err.status === 403));
+        container.innerHTML = isAuth
+          ? `<div class="empty-state">
+              <i data-lucide="key-round"></i>
+              <p>需要 API Key 才能读取 AI 列表</p>
+              <button class="btn btn-secondary" style="margin-top:8px" onclick="if(typeof AuthGate!=='undefined')AuthGate.open('missing')">填入 Key</button>
+            </div>`
+          : `<div class="empty-state">
+              <i data-lucide="alert-circle"></i>
+              <p>加载失败: ${escapeHtml(err.message)}</p>
+              <button class="btn btn-secondary" style="margin-top:8px" onclick="refreshAIs()">重试</button>
+            </div>`;
+        console.error('加载 AI 列表失败:', err);
         lucide.createIcons();
       }
     }
 
-    // 获取 AI 图标
-    function getAIIcon(type) {
+    // 获取 AI 图标（按适配器 ai_id）
+    function getAIIcon(aiId) {
       const icons = {
-        'trae': 'T',
-        'cursor': 'C',
-        'claude': 'A',
+        'trae_work': 'T',
+        'dumate': 'D',
+        'dumate_app': 'D',
         'default': 'AI'
       };
-      return icons[type] || icons.default;
+      return icons[aiId] || icons.default;
     }
 
     // 选择 AI
@@ -728,7 +765,7 @@
     function updateAISelect() {
       const select = document.getElementById('selectedAI');
       select.innerHTML = '<option value="">-- 请选择 AI --</option>' +
-        aiList.map(ai => `<option value="${ai.ai_id}">${ai.name} (${ai.type})</option>`).join('');
+        aiList.map(ai => `<option value="${ai.ai_id}">${escapeHtml(ai.name)}${ai.connected ? '' : '（未连接）'}</option>`).join('');
     }
 
     // 加载任务列表
@@ -824,9 +861,16 @@
     }
 
     // 发送指令
+    // 走适配器无关的通用接口：createTask 拿 conversation_id，再轮询 getOutput 取回复
+    let _dispatchPollTimer = null;
+
     async function sendPrompt() {
       if (!selectedAI) {
         showNotification('请先选择 AI', 'warning');
+        return;
+      }
+      if (!selectedAI.connected) {
+        showNotification('该 Agent 未连接，请先到 Agents 总览连接', 'warning');
         return;
       }
 
@@ -844,36 +888,58 @@
       responseArea.style.display = 'block';
       document.getElementById('responseContent').innerHTML = '<span class="loading-spinner"></span> 等待响应...';
       document.getElementById('responseSource').textContent = '';
-
-      const startTime = Date.now();
+      document.getElementById('responseTime').textContent = '';
 
       try {
-        const data = await workApi.askAI(selectedAI.ai_id, {
-          prompt: prompt,
-          adapter_name: 'trae',
-          timeout: 60,
-        });
-
-        const elapsed = Date.now() - startTime;
-        const response = data.last_turn?.response || data.response || '无响应';
-        const source = data.last_turn?.response_source || 'unknown';
-
-        document.getElementById('responseContent').textContent = response;
-        document.getElementById('responseSource').innerHTML = `<span class="response-source ${source}">${source === 'log' ? '日志' : 'OCR'}</span>`;
-        document.getElementById('responseTime').textContent = `耗时 ${(elapsed / 1000).toFixed(1)}s`;
-
-        showNotification('指令发送成功', 'success');
-
+        const res = await adapterApi.createTask(selectedAI.ai_id, prompt, { taskType: 'work' });
+        if (!res.success) {
+          throw new Error(res.message || '后端拒绝了这次派发');
+        }
+        document.getElementById('responseContent').textContent = '已发送，等待回复…';
+        pollDispatchOutput(selectedAI.ai_id, res.conversation_id);
       } catch (err) {
-        document.getElementById('responseContent').textContent = '错误: ' + err.message;
+        const msg = (err.status === 503)
+          ? '适配器未连接，请先到 Agents 总览连接'
+          : err.message;
+        document.getElementById('responseContent').textContent = '错误: ' + msg;
         document.getElementById('responseSource').innerHTML = '<span class="response-source" style="background: rgba(239, 68, 68, 0.15); color: #ef4444;">失败</span>';
-        showNotification('发送失败: ' + err.message, 'error');
+        showNotification('发送失败: ' + msg, 'error');
       } finally {
         btn.disabled = false;
         btn.innerHTML = '<i data-lucide="send"></i> 发送指令';
         lucide.createIcons();
         updateSendButton();
       }
+    }
+
+    // 轮询回复：2s 一次、60s 上限；失败只记一次日志
+    function pollDispatchOutput(aiId, convId) {
+      if (_dispatchPollTimer) clearInterval(_dispatchPollTimer);
+      const startTime = Date.now();
+      let elapsed = 0;
+      let got = false;
+      let errLogged = false;
+      _dispatchPollTimer = setInterval(async () => {
+        elapsed += 2;
+        try {
+          const out = await adapterApi.getOutput(aiId, convId, 500);
+          if (out && out.found && out.content) {
+            got = true;
+            document.getElementById('responseContent').textContent = out.content;
+            document.getElementById('responseSource').innerHTML = '<span class="response-source log">已回复</span>';
+            document.getElementById('responseTime').textContent = `耗时 ${((Date.now() - startTime) / 1000).toFixed(1)}s`;
+          }
+        } catch (e) {
+          if (!errLogged) { errLogged = true; console.error('读取回复失败', aiId, e); }
+        }
+        if (elapsed >= 60) {
+          clearInterval(_dispatchPollTimer);
+          _dispatchPollTimer = null;
+          if (!got) {
+            document.getElementById('responseContent').textContent = '仍无回复，可能任务较长，请到对应 AI 窗口查看';
+          }
+        }
+      }, 2000);
     }
 
     // 监听输入变化

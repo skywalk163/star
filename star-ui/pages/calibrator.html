@@ -38,6 +38,7 @@
 }
     </style>
     <script src="/ui/js/api-bridge.js"></script>
+    <script src="/ui/js/auth-gate.js"></script>
     <script src="/ui/js/nav.js"></script>
     <style>
       * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -352,6 +353,23 @@
         animation: spin 0.8s linear infinite;
       }
       @keyframes spin { to { transform: rotate(360deg); } }
+
+      /* ===== 窄屏（手机）适配 ===== */
+      /* 这一页的左右栏是校准工具的候选列表与参数区，不是导航——隐藏会让页面
+         在手机上直接失去功能，所以改为纵向堆叠而不是 display:none */
+      @media (max-width: 768px) {
+        body { height: auto; min-height: 100vh; overflow-y: auto; }
+        .app { height: auto; min-height: 100vh; }
+        .body { flex-direction: column; overflow: visible; }
+        .sidebar, .right-panel {
+          width: 100%; flex-shrink: 1;
+          border-right: none; border-left: none;
+          border-bottom: 1px solid var(--color-border);
+          overflow: visible;
+        }
+        .main { height: auto; overflow: visible; }
+        .form-grid-2 { grid-template-columns: 1fr; }
+      }
     </style>
 </head>
 <body>

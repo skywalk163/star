@@ -53,43 +53,63 @@
     // ========== HTTP 工具 ==========
     
     const API_BASE = '/api';
-    
+
+    // 鉴权已默认拒绝：这些 helper 必须带上 X-API-Key。
+    // 若页面引入了 api-bridge.js，优先复用 apiFetch（它还会在 401 时广播 star:unauthorized）。
+    function authHeaders(extra) {
+        const h = Object.assign({}, extra);
+        try {
+            const key = (typeof getApiKey === 'function' && getApiKey()) ||
+                        localStorage.getItem('star_api_key');
+            if (key) h['X-API-Key'] = key;
+        } catch (e) { /* localStorage 不可用时静默跳过 */ }
+        return h;
+    }
+
+    function hasApiFetch() {
+        return typeof apiFetch === 'function';
+    }
+
     async function apiGet(path, params) {
         params = params || {};
         const url = new URL(API_BASE + path, window.location.origin);
         Object.entries(params).forEach(([k, v]) => {
             if (v !== undefined && v !== null) url.searchParams.append(k, v);
         });
-        
-        const res = await fetch(url.toString());
+
+        if (hasApiFetch()) return apiFetch(url.pathname + url.search);
+        const res = await fetch(url.toString(), { headers: authHeaders() });
         if (!res.ok) throw new Error('HTTP ' + res.status);
         return res.json();
     }
-    
+
     async function apiPost(path, data) {
         data = data || {};
+        if (hasApiFetch()) return apiFetch(API_BASE + path, { method: 'POST', body: JSON.stringify(data) });
         const res = await fetch(API_BASE + path, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: authHeaders({ 'Content-Type': 'application/json' }),
             body: JSON.stringify(data)
         });
         if (!res.ok) throw new Error('HTTP ' + res.status);
         return res.json();
     }
-    
+
     async function apiPut(path, data) {
         data = data || {};
+        if (hasApiFetch()) return apiFetch(API_BASE + path, { method: 'PUT', body: JSON.stringify(data) });
         const res = await fetch(API_BASE + path, {
             method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
+            headers: authHeaders({ 'Content-Type': 'application/json' }),
             body: JSON.stringify(data)
         });
         if (!res.ok) throw new Error('HTTP ' + res.status);
         return res.json();
     }
-    
+
     async function apiDelete(path) {
-        const res = await fetch(API_BASE + path, { method: 'DELETE' });
+        if (hasApiFetch()) return apiFetch(API_BASE + path, { method: 'DELETE' });
+        const res = await fetch(API_BASE + path, { method: 'DELETE', headers: authHeaders() });
         if (!res.ok) throw new Error('HTTP ' + res.status);
         return res.json();
     }
