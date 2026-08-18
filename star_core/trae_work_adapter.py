@@ -59,6 +59,15 @@ logger = logging.getLogger(__name__)
 _DEFAULT_TRAE_CDP_PORT = 9223
 
 
+def _chat_ready_timeout_after_launch(launch_timeout: float) -> float:
+    """刚拉起/重启 Trae 后等待聊天页就绪的宽限秒数。
+
+    冷启动（尤其自更新后）聊天页可能要比端口晚几十秒才就绪，锁死短宽限会
+    误报失败。取启动超时的 1.5 倍、至少 30s、上限 90s。
+    """
+    return min(max(30.0, launch_timeout * 1.5), 90.0)
+
+
 class TraeWorkAdapter(AIAdapter):
     """Trae Work 适配器
 
@@ -167,7 +176,10 @@ class TraeWorkAdapter(AIAdapter):
             )
             return False
 
-        return self._connect_to_target()
+        # 刚拉起 Trae：冷启动/自更新后聊天页可能要更久，给足自适应宽限
+        return self._connect_to_target(
+            chat_ready_timeout=_chat_ready_timeout_after_launch(launch_timeout)
+        )
 
     def self_check(self) -> dict | None:
         """执行一次能力自检并返回结构化结果（同时缓存到 ``_last_self_check``）。
@@ -193,34 +205,63 @@ class TraeWorkAdapter(AIAdapter):
     def _connect_to_target(self, chat_ready_timeout: float = 12.0) -> bool:
         """校验聊天目标并完成连接（端口已被认为可达）。
 
-        Trae 刚启动时光端口已通、聊天 target 往往还没就绪，若立即校验会
-        抢跑失败（表现为"重启后端口起来了却连不上"）。这里给一段宽限期
-        轮询聊天 target，命中即连接；超时仍未命中才返回 False。
+        Trae 刚启动（或刚重启）时光端口已通、聊天页往往还要加载几秒到几十秒
+        （冷启动 / 自更新后更久），若立即校验会抢跑失败。这里以
+        ``chat_ready_timeout`` 为上限轮询聊天 target：
+          - Trae 已在运行 → 调用方用默认短宽限（12s）；
+          - Trae 刚由 Star 拉起 / 重启 → 调用方传入更长宽限
+            （见 :meth:`connect` / :meth:`restart_with_cdp`）。
+        轮询期间若 CDP 端口失联（Trae 退出）立即放弃，不干等。
 
-        连接成功后自动触发一次能力自检，结果缓存到 ``_last_self_check``，
-        供 UI 展示「CDP 是否真实可用 / 渲染器能否被脚本化驱动」。
+        连接成功后自动触发一次能力自检；若页面刚就绪、JS 上下文还差一拍
+        （自检瞬时 ok=False），会在剩余宽限内自动重试，让连接返回时尽量
+        携带「真正可驱动」的自检结论。
         """
-        deadline = time.time() + chat_ready_timeout
+        started = time.time()
+        deadline = started + max(chat_ready_timeout, 1.0)
         target = None
         while time.time() < deadline:
+            if not self._bridge.is_alive():
+                logger.warning(
+                    "TraeWorkAdapter: 等待聊天 target 期间 CDP 端口 %d 失联"
+                    "（Trae 可能已退出），放弃等待",
+                    self.port,
+                )
+                return False
             target = self._bridge.find_chat_target(force_refresh=True)
             if target:
                 break
             time.sleep(1.0)
         if not target:
             logger.warning(
-                "TraeWorkAdapter: 未找到聊天目标 target（%ds 宽限内）",
+                "TraeWorkAdapter: %.0fs 宽限内未找到聊天目标 target"
+                "（CDP 端口仍可达，Trae 可能尚未加载出聊天页）",
                 chat_ready_timeout,
             )
             return False
+        logger.info(
+            "TraeWorkAdapter: 聊天 target 就绪（等待 %.1fs）",
+            time.time() - started,
+        )
         self._connected = True
         logger.info(
             "TraeWorkAdapter: 已连接到 Trae Work (target=%s, port=%d)",
             target.get("title", "unknown"), self.port,
         )
-        # 连接成功后自动能力自检（非阻塞关键路径，失败只记日志不影响连接状态）
+        # 连接成功后自动能力自检（非阻塞关键路径，失败只记日志不影响连接状态）。
+        # 刚就绪的页面 JS 上下文可能还差一拍：剩余宽限内重试几次，让自检尽量
+        # 反映「真正可驱动」而非瞬时未就绪。
         try:
             self._last_self_check = self._bridge.self_check()
+            retries = 0
+            while (
+                not (self._last_self_check or {}).get("ok")
+                and retries < 5
+                and time.time() < deadline
+            ):
+                time.sleep(2.0)
+                self._last_self_check = self._bridge.self_check()
+                retries += 1
             logger.info("TraeWorkAdapter: 能力自检 %s", self._last_self_check)
         except Exception as e:  # pragma: no cover
             logger.warning("TraeWorkAdapter: 能力自检异常: %s", e)
@@ -256,7 +297,10 @@ class TraeWorkAdapter(AIAdapter):
             )
             return False
 
-        return self._connect_to_target()
+        # 刚重启 Trae：聊天页就绪同样要给足自适应宽限
+        return self._connect_to_target(
+            chat_ready_timeout=_chat_ready_timeout_after_launch(launch_timeout)
+        )
 
     def disconnect(self) -> None:
         """断开连接"""
