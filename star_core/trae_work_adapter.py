@@ -190,15 +190,28 @@ class TraeWorkAdapter(AIAdapter):
         """返回最近一次自检结果（不重新执行）。"""
         return self._last_self_check
 
-    def _connect_to_target(self) -> bool:
+    def _connect_to_target(self, chat_ready_timeout: float = 12.0) -> bool:
         """校验聊天目标并完成连接（端口已被认为可达）。
+
+        Trae 刚启动时光端口已通、聊天 target 往往还没就绪，若立即校验会
+        抢跑失败（表现为"重启后端口起来了却连不上"）。这里给一段宽限期
+        轮询聊天 target，命中即连接；超时仍未命中才返回 False。
 
         连接成功后自动触发一次能力自检，结果缓存到 ``_last_self_check``，
         供 UI 展示「CDP 是否真实可用 / 渲染器能否被脚本化驱动」。
         """
-        target = self._bridge.find_chat_target(force_refresh=True)
+        deadline = time.time() + chat_ready_timeout
+        target = None
+        while time.time() < deadline:
+            target = self._bridge.find_chat_target(force_refresh=True)
+            if target:
+                break
+            time.sleep(1.0)
         if not target:
-            logger.warning("TraeWorkAdapter: 未找到聊天目标 target")
+            logger.warning(
+                "TraeWorkAdapter: 未找到聊天目标 target（%ds 宽限内）",
+                chat_ready_timeout,
+            )
             return False
         self._connected = True
         logger.info(

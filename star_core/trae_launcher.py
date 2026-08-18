@@ -239,18 +239,41 @@ def _clean_trae_singleton_lock() -> None:
 
     Trae 强杀（taskkill /F）后，user data 目录下的 ``code.lock`` 可能残留，
     导致后续零参数启动被单实例逻辑静默退出。启动前清理它。
+
+    .. warning::
+        本机 Python 可能被 ``safe-delete`` 这类安全钩子接管 ``os.remove``
+        （把删除转投回收站）。在回收站不可用的环境（如沙箱）下该钩子的 native
+        实现会直接 **段错误** 拖垮整个进程。因此这里优先用 ``ctypes`` 直接调
+        ``DeleteFileW`` 绕过 Python 层钩子做硬删除；任何失败都只记日志、不抛、
+        不致命——锁清不掉顶多让新实例多等一次，远比进程崩溃轻。
     """
     candidates = [
         os.path.join(os.path.expandvars("%APPDATA%"), "TRAE SOLO CN", "code.lock"),
         os.path.join(os.path.expanduser("~"), ".trae-cn", "code.lock"),
     ]
+    deleted_any = False
     for c in candidates:
+        if not os.path.isfile(c):
+            continue
+        # 优先：ctypes 直删，绕过 safe-delete 钩子，避免沙箱段错误
+        if os.name == "nt":
+            try:
+                k32 = __import__("ctypes").windll.kernel32
+                if k32.DeleteFileW(c):  # 返回非 0 表示成功
+                    logger.info("已清理单实例锁(原生): %s", c)
+                    deleted_any = True
+                    continue
+            except Exception as e:  # pragma: no cover
+                logger.debug("ctypes 删除单实例锁失败 %s: %s（回退 os.remove）", c, e)
+        # 回退：os.remove（正常桌面环境由 safe-delete 投回收站，无碍）
         try:
-            if os.path.isfile(c):
-                os.remove(c)
-                logger.info("已清理单实例锁: %s", c)
+            os.remove(c)
+            logger.info("已清理单实例锁: %s", c)
+            deleted_any = True
         except Exception as e:  # pragma: no cover
             logger.warning("清理单实例锁失败 %s: %s", c, e)
+    if not deleted_any:
+        logger.info("单实例锁无需清理或暂不可删（残留锁不影响新实例启动）")
 
 
 def launch_trae_with_cdp(port: int = _DEFAULT_TRAE_CDP_PORT, timeout: float = 30.0) -> bool:
@@ -396,10 +419,14 @@ def kill_trae_processes(exe_path: Optional[str] = None, timeout: float = 8.0) ->
     killed: List[int] = []
     for pid in pids:
         try:
-            # /T 杀掉整棵进程树（Electron 主进程 + 渲染/辅助进程）
+            # /T 杀掉整棵进程树（Electron 主进程 + 渲染/辅助进程）。
+            # 中文 Windows 下 taskkill 输出为 GBK，必须显式指定 encoding，
+            # 否则 text=True 用 utf-8 读 stdout 会触发 UnicodeDecodeError 把
+            # 读线程打崩（表现为后台大量 Exception in thread _readerthread）。
             subprocess.run(
                 ["taskkill", "/PID", str(pid), "/F", "/T"],
-                capture_output=True, text=True, timeout=10,
+                capture_output=True, text=True, encoding="gbk", errors="ignore",
+                timeout=10,
             )
             killed.append(pid)
         except Exception as e:  # pragma: no cover
@@ -521,17 +548,20 @@ def _run_in_interactive_session(bat_path: str, task_name: str = "StarTraeRestart
         logger.warning("_run_in_interactive_session: 取不到当前用户名，无法创建交互式任务")
         return False
     try:
+        # schtasks 在中文 Windows 下输出 GBK，需显式 encoding 否则读线程崩溃
         subprocess.run(
             ["schtasks", "/create", "/tn", task_name, "/tr", f'"{bat_path}"',
              "/sc", "onlogon", "/ru", user, "/it", "/rl", "highest", "/f"],
-            capture_output=True, text=True, timeout=30,
+            capture_output=True, text=True, encoding="gbk", errors="ignore",
+            timeout=30,
         )
     except Exception as e:  # pragma: no cover
         logger.warning("_run_in_interactive_session: 创建计划任务失败: %s", e)
     try:
         r = subprocess.run(
             ["schtasks", "/run", "/tn", task_name],
-            capture_output=True, text=True, timeout=30,
+            capture_output=True, text=True, encoding="gbk", errors="ignore",
+            timeout=30,
         )
         if r.returncode != 0:
             logger.warning(

@@ -289,6 +289,22 @@ _PROBE_GLOBALS_JS = """
 """
 
 
+def _is_blank_target(tab: dict) -> bool:
+    """判断一个 CDP target 是否为「空白/未就绪」页（欢迎页、about:blank 等）。
+
+    这类页不是聊天 UI，且在其 JS 执行上下文尚未就绪时对其做
+    ``Runtime.evaluate`` 会触发原生层崩溃（曾导致 Star 进程段错误）。
+    因此匹配聊天 target 时必须先排除它们。
+    """
+    url = (tab.get("url") or "").strip()
+    title = (tab.get("title") or "").strip()
+    if url.startswith("about:"):
+        return True
+    if not url and not title:
+        return True
+    return False
+
+
 class TraeCDPBridge:
     """Trae Electron CDP 桥。
 
@@ -330,6 +346,11 @@ class TraeCDPBridge:
         Trae 启动 --remote-debugging-port 后，/json 会列出多个 target。
         本方法优先找 type=page 且标题/URL 匹配 Trae 的 target。
 
+        .. note::
+            先过滤掉空白/未就绪 target（标题与 URL 都为空、或 ``about:`` 页）。
+            它们不是聊天 UI，且其 JS 上下文未就绪时 ``Runtime.evaluate`` 会触发
+            原生崩溃；过滤后 connect/restart 会正确等待真正的聊天页加载完成。
+
         Args:
             force_refresh: 强制刷新缓存。
 
@@ -348,8 +369,17 @@ class TraeCDPBridge:
             logger.debug("TraeCDP: /json 未返回任何 target")
             return None
 
+        # 过滤空白/未就绪 target，只对真实聊天页匹配（避免对半初始化页求值崩溃）
+        real_tabs = [t for t in tabs if not _is_blank_target(t)]
+        if not real_tabs:
+            logger.debug(
+                "TraeCDP: 仅发现空白/未就绪 target（共 %d 个），聊天页尚未加载",
+                len(tabs),
+            )
+            return None
+
         # 优先策略1: 找 url 含 vscode/file 的
-        for tab in tabs:
+        for tab in real_tabs:
             url = tab.get("url") or ""
             if ("vscode" in url or "file://" in url) and tab.get("id"):
                 self._cached_target = tab
@@ -358,15 +388,15 @@ class TraeCDPBridge:
                 return tab
 
         # 策略2: 找标题含 Trae 的
-        for tab in tabs:
+        for tab in real_tabs:
             title = tab.get("title") or ""
             if "trae" in title.lower() and tab.get("id"):
                 self._cached_target = tab
                 self._target_cache_time = time.time()
                 return tab
 
-        # 策略3: 第一个有 webSocketDebuggerUrl 的
-        for tab in tabs:
+        # 策略3: 第一个有 webSocketDebuggerUrl 的（real_tabs 已排除空白页）
+        for tab in real_tabs:
             if tab.get("webSocketDebuggerUrl"):
                 self._cached_target = tab
                 self._target_cache_time = time.time()
