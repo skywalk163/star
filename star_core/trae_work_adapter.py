@@ -93,6 +93,8 @@ class TraeWorkAdapter(AIAdapter):
         self._bridge = TraeCDPBridge(port=port)
         self._connected = False
         self._last_response = ""
+        # 最近一次能力自检结果（connect / restart 成功后自动触发）
+        self._last_self_check: dict | None = None
 
         super().__init__()
 
@@ -167,8 +169,33 @@ class TraeWorkAdapter(AIAdapter):
 
         return self._connect_to_target()
 
+    def self_check(self) -> dict | None:
+        """执行一次能力自检并返回结构化结果（同时缓存到 ``_last_self_check``）。
+
+        仅当已连接（端口可达且命中聊天 target）时有意义；未连接返回 None。
+        """
+        if not self._connected:
+            return None
+        try:
+            self._last_self_check = self._bridge.self_check()
+        except Exception as e:
+            logger.warning("TraeWorkAdapter: 能力自检异常: %s", e)
+            self._last_self_check = {
+                "ok": False, "port": self.port, "cdp_reachable": False,
+                "detail": f"自检执行异常: {e}",
+            }
+        return self._last_self_check
+
+    def get_self_check(self) -> dict | None:
+        """返回最近一次自检结果（不重新执行）。"""
+        return self._last_self_check
+
     def _connect_to_target(self) -> bool:
-        """校验聊天目标并完成连接（端口已被认为可达）。"""
+        """校验聊天目标并完成连接（端口已被认为可达）。
+
+        连接成功后自动触发一次能力自检，结果缓存到 ``_last_self_check``，
+        供 UI 展示「CDP 是否真实可用 / 渲染器能否被脚本化驱动」。
+        """
         target = self._bridge.find_chat_target(force_refresh=True)
         if not target:
             logger.warning("TraeWorkAdapter: 未找到聊天目标 target")
@@ -178,6 +205,12 @@ class TraeWorkAdapter(AIAdapter):
             "TraeWorkAdapter: 已连接到 Trae Work (target=%s, port=%d)",
             target.get("title", "unknown"), self.port,
         )
+        # 连接成功后自动能力自检（非阻塞关键路径，失败只记日志不影响连接状态）
+        try:
+            self._last_self_check = self._bridge.self_check()
+            logger.info("TraeWorkAdapter: 能力自检 %s", self._last_self_check)
+        except Exception as e:  # pragma: no cover
+            logger.warning("TraeWorkAdapter: 能力自检异常: %s", e)
         return True
 
     def restart_with_cdp(self, launch_timeout: float = 30.0) -> bool:

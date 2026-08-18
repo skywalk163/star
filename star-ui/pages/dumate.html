@@ -1229,14 +1229,18 @@
                 <div class="adapter-status-text ${(!usable && canRestart) ? 'hint' : ''}">${escapeHtml(statusText)}${escapeHtml(hint)}</div>
               </div>
               ${usable
-                ? `<button class="adapter-btn disconnect" onclick="disconnectAdapter('${a.ai_id}')">断开</button>`
+                ? `<button class="adapter-btn disconnect" onclick="disconnectAdapter('${a.ai_id}')">断开</button>${
+                    canRestart
+                      ? `<button class="adapter-btn restart" onclick="restartAdapter('${a.ai_id}')">检测并重启</button>`
+                      : ''}`
                 : `<button class="adapter-btn connect" onclick="connectAdapter('${a.ai_id}')">连接</button>${
                     canRestart
-                      ? `<button class="adapter-btn restart" onclick="restartAdapter('${a.ai_id}')">重启并连接</button>`
+                      ? `<button class="adapter-btn restart" onclick="restartAdapter('${a.ai_id}')">检测并重启</button>`
                       : ''}`}
             </div>
             ${meta ? `<div class="adapter-meta">${escapeHtml(meta)}</div>` : ''}
             ${caps ? `<div class="adapter-caps">${caps}</div>` : ''}
+            ${selfCheckHtml(a)}
             ${usable ? `
             <div class="adapter-inline">
               <textarea id="inline-prompt-${a.ai_id}" placeholder="给 ${escapeHtml(a.ai_name || a.ai_id)} 发一条指令…"></textarea>
@@ -1269,6 +1273,27 @@
       return '已连接';
     }
 
+    // 能力自检结果展示：连接成功后 Star 自动跑一次，UI 直接呈现结论
+    function selfCheckHtml(a) {
+      const sc = a.self_check;
+      if (!sc) return '';
+      const ok = !!sc.ok;
+      const color = ok ? 'var(--color-success)' : 'var(--color-warning)';
+      const icon = ok ? '✔' : '⚠';
+      const parts = [];
+      if (sc.browser) parts.push(escapeHtml(String(sc.browser).split('/')[0]));
+      if (sc.target_count != null) parts.push(sc.target_count + ' 个 target');
+      if (ok) {
+        parts.push(sc.scriptable ? '渲染器可脚本化驱动' : '渲染器不可脚本化');
+      }
+      const detail = sc.detail ? escapeHtml(sc.detail) : '';
+      return `
+        <div class="adapter-meta" style="color:${color};display:flex;gap:6px;align-items:flex-start;margin-top:2px">
+          <span>${icon}</span>
+          <span>${parts.join(' · ')}${detail ? ' — ' + detail : ''}</span>
+        </div>`;
+    }
+
     // 列表接口不含 status，仅对已连接适配器逐个拉单体 /status；失败不阻塞渲染
     async function loadAdapterStatuses() {
       const targets = window.adaptersCache.filter(a => a.connected);
@@ -1281,7 +1306,12 @@
       let changed = false;
       results.filter(Boolean).forEach(r => {
         const a = window.adaptersCache.find(x => x.ai_id === r.ai_id);
-        if (a && a.runtime_status !== r.status) { a.runtime_status = r.status; changed = true; }
+        if (!a) return;
+        if (a.runtime_status !== r.status) { a.runtime_status = r.status; changed = true; }
+        // 持续同步能力自检结果（/status 已附带 self_check）
+        if (r.self_check && JSON.stringify(a.self_check) !== JSON.stringify(r.self_check)) {
+          a.self_check = r.self_check; changed = true;
+        }
       });
       if (changed) renderAdapters();
     }
@@ -1343,6 +1373,11 @@
         const res = await adapterApi.connect(aiId);
         if (res.success) {
           showNotification('✓ ' + res.message, 'success');
+          // 连接成功附带的能力自检，立即落到缓存并展示
+          if (res.self_check) {
+            const a = window.adaptersCache.find(x => x.ai_id === aiId);
+            if (a) { a.self_check = res.self_check; renderAdapters(); }
+          }
         } else {
           showNotification('✗ ' + (res.message || '连接失败'), 'error');
         }
@@ -1373,6 +1408,11 @@
         const res = await adapterApi.restart(aiId);
         if (res.success) {
           showNotification('✓ ' + res.message, 'success');
+          // 重启并连接成功后附带的能力自检，立即落到缓存并展示
+          if (res.self_check) {
+            const a = window.adaptersCache.find(x => x.ai_id === aiId);
+            if (a) { a.self_check = res.self_check; renderAdapters(); }
+          }
         } else {
           showNotification('✗ ' + (res.message || '重启失败'), 'error');
         }

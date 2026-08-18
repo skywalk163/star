@@ -76,6 +76,18 @@ class CDPBridge:
             tabs.append({field: target.get(field) for field in _TAB_FIELDS})
         return tabs
 
+    def version(self) -> dict | None:
+        """读取 CDP /json/version，返回浏览器/协议版本信息；失败返回 None。
+
+        用于能力自检：确认端口上是真实的 CDP（而非死监听），并取回
+        ``Browser`` / ``Protocol-Version`` / ``webSocketDebuggerUrl``。
+        """
+        try:
+            with urllib.request.urlopen(f"{self._base_url}/json/version", timeout=2.0) as resp:
+                return json.loads(resp.read().decode("utf-8", errors="replace"))
+        except Exception:
+            return None
+
     def find_tab(self, url_pattern: str) -> dict | None:
         """按 url 匹配标签页：优先正则，正则非法时退化为子串匹配。
 

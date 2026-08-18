@@ -413,6 +413,8 @@ const adapterApi = {
   restart: (aiId) => apiFetch(`/api/dumate/adapters/${aiId}/restart`, { method: 'POST' }),
   setDefault: (aiId) => apiFetch(`/api/dumate/adapters/${aiId}/default`, { method: 'POST' }),
   status: (aiId) => apiFetch(`/api/dumate/adapters/${aiId}/status`),
+  // 连接成功后能力自检（仅 Trae Work 等实现了 self_check 的适配器返回有效数据）
+  selfCheck: (aiId) => apiFetch(`/api/dumate/adapters/${aiId}/selfcheck`),
   createTask: (aiId, prompt, opts) => {
     const { workspaceId, taskType } = opts || {};
     return apiFetch(`/api/dumate/adapters/${aiId}/tasks`, {

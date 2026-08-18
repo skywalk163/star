@@ -425,6 +425,14 @@ def restart_trae_with_cdp(
     无法拉起 CDP 实例"的场景：先彻底退出旧实例（清单实例锁），
     再通过 argv.json + 零参数启动带调试端口的新实例。
 
+    重启落到**用户交互式会话**的策略：
+    - 主路径：直接零参数 ``Popen`` 启动。当 Star 后端就在用户桌面会话里
+      运行时（本地开发机的常态），新 Trae 进程直接落在桌面会话、GUI 正常出现。
+    - 回退：若直接启动后 CDP 端口仍拉不起来（说明 Star 不在桌面会话，如以
+      服务/其它会话运行，GUI 进程无法跨会话显形），则生成并经由
+      ``schtasks`` 交互式计划任务把重启脚本跑在用户的桌面会话——这正是此前
+      手动双击 ``restart_trae_cdp.bat`` 验证可用的跨会话通道。
+
     Args:
         port: CDP 端口号（默认 9223）。
         launch_timeout: 等待新实例 CDP 端口就绪的最长秒数。
@@ -433,4 +441,106 @@ def restart_trae_with_cdp(
         True 表示新实例 CDP 端口已可用
     """
     kill_trae_processes(None)
-    return launch_trae_with_cdp(port, timeout=launch_timeout)
+    # 预生成重启脚本：既作交互式回退的载体，也供用户随时手动双击复位
+    bat = write_restart_bat()
+
+    # 主路径：直接启动（Star 在用户会话里即落在桌面会话）
+    if launch_trae_with_cdp(port, timeout=launch_timeout):
+        return True
+
+    # 回退：本会话拉不起 GUI 时，用计划任务把脚本跑在交互式桌面会话
+    logger.warning(
+        "restart_trae_with_cdp: 直接启动未拉起 CDP 端口 %d，回退交互式会话运行 %s",
+        port, bat,
+    )
+    _run_in_interactive_session(bat)
+    return wait_for_cdp(port, timeout=launch_timeout)
+
+
+#: 重启脚本文件名（落于用户主目录；UI「检测并重启」按钮经后端落到此脚本/交互式任务）
+_RESTART_BAT_NAME = "restart_trae_cdp.bat"
+
+
+def get_restart_bat_path() -> str:
+    """返回重启脚本的绝对路径（用户主目录下）。"""
+    return os.path.join(os.path.expanduser("~"), _RESTART_BAT_NAME)
+
+
+def write_restart_bat(path: str | None = None) -> str:
+    """生成「检测并重启」用的 ``.bat``（自动维护，避免手工脚本与安装路径漂移）。
+
+    用 ``%LOCALAPPDATA%`` / ``%APPDATA%`` 环境变量而非硬编码用户名，适配不同
+    机器；自更新器结束用通配 ``TRAE SOLOSetup-stable-*.exe`` 兼容版本号漂移。
+
+    Args:
+        path: 脚本路径（默认用户主目录下的 ``restart_trae_cdp.bat``）。
+
+    Returns:
+        脚本绝对路径（即使写入失败也尽量返回预期路径，便于回退调用）
+    """
+    path = path or get_restart_bat_path()
+    content = (
+        "@echo off\r\n"
+        "REM 由 Star 自动生成：彻底重启 Trae 并经 argv.json 拉起真实 CDP。\r\n"
+        "REM 结束旧 Trae 主进程 + 自更新器 -> 清单实例锁 -> 零参数启动主程序。\r\n"
+        'taskkill /IM "TRAE SOLO CN.exe" /F 2>nul\r\n'
+        'taskkill /IM "TRAE SOLOSetup-stable-*.exe" /F 2>nul\r\n'
+        'del /Q "%APPDATA%\\TRAE SOLO CN\\code.lock" 2>nul\r\n'
+        "timeout /t 2 >nul\r\n"
+        'start "" "%LOCALAPPDATA%\\Programs\\TRAE SOLO CN\\TRAE SOLO CN.exe"\r\n'
+    )
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w", encoding="utf-8", newline="") as f:
+            f.write(content)
+        logger.info("write_restart_bat: 已生成 %s", path)
+    except Exception as e:  # pragma: no cover
+        logger.warning("write_restart_bat: 写入失败: %s", e)
+    return path
+
+
+def _run_in_interactive_session(bat_path: str, task_name: str = "StarTraeRestart") -> bool:
+    """在交互式桌面会话里用计划任务运行 ``.bat``（跨会话边界拉起 GUI）。
+
+    仅当本进程所在会话拉不起 GUI（如 Star 以服务/不同会话运行）时作为回退。
+    创建幂等（任务已存在则 ``/f`` 覆盖），随后 ``/run`` 立即触发；任何失败
+    都返回 False，由调用方最终以 ``wait_for_cdp`` 判定结果。
+
+    Returns:
+        True 表示计划任务已成功创建并触发
+    """
+    import getpass
+
+    user = os.environ.get("USERNAME") or ""
+    if not user and hasattr(getpass, "getuser"):
+        try:
+            user = getpass.getuser()
+        except Exception:
+            user = ""
+    if not user:
+        logger.warning("_run_in_interactive_session: 取不到当前用户名，无法创建交互式任务")
+        return False
+    try:
+        subprocess.run(
+            ["schtasks", "/create", "/tn", task_name, "/tr", f'"{bat_path}"',
+             "/sc", "onlogon", "/ru", user, "/it", "/rl", "highest", "/f"],
+            capture_output=True, text=True, timeout=30,
+        )
+    except Exception as e:  # pragma: no cover
+        logger.warning("_run_in_interactive_session: 创建计划任务失败: %s", e)
+    try:
+        r = subprocess.run(
+            ["schtasks", "/run", "/tn", task_name],
+            capture_output=True, text=True, timeout=30,
+        )
+        if r.returncode != 0:
+            logger.warning(
+                "_run_in_interactive_session: schtasks /run 返回 %s: %s",
+                r.returncode, (r.stderr or r.stdout or "").strip(),
+            )
+            return False
+        return True
+    except Exception as e:  # pragma: no cover
+        logger.warning("_run_in_interactive_session: 运行计划任务失败: %s", e)
+        return False
+

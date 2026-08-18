@@ -270,11 +270,20 @@ async def connect_adapter(ai_id: str):
     # 设为默认
     registry.set_default(ai_id)
 
+    # 连接成功后附带能力自检结果（若有），便于 UI 直接展示
+    sc = None
+    if hasattr(adapter, "get_self_check"):
+        try:
+            sc = adapter.get_self_check()
+        except Exception:
+            sc = None
+
     return {
         "success": True,
         "ai_id": ai_id,
         "ai_name": adapter.AI_NAME,
         "message": f"已连接 {adapter.AI_NAME}",
+        "self_check": sc,
     }
 
 
@@ -327,11 +336,21 @@ async def restart_adapter(ai_id: str):
 
     registry.set_default(ai_id)
     suffix = f"（调试端口 {port}）" if port else ""
+
+    # 重启并连接成功后附带能力自检结果（若有），便于 UI 直接展示
+    sc = None
+    if hasattr(adapter, "get_self_check"):
+        try:
+            sc = adapter.get_self_check()
+        except Exception:
+            sc = None
+
     return {
         "success": True,
         "ai_id": ai_id,
         "ai_name": adapter.AI_NAME,
         "message": f"已重启并连接 {adapter.AI_NAME}{suffix}",
+        "self_check": sc,
     }
 
 
@@ -419,7 +438,14 @@ async def get_adapter_status(ai_id: str):
         raise HTTPException(status_code=404, detail=f"AI 适配器 {ai_id} 未注册")
 
     def _snapshot() -> dict:
-        return {"alive": adapter.is_alive(), "status": adapter.get_status()}
+        out = {"alive": adapter.is_alive(), "status": adapter.get_status()}
+        # 已连接且支持自检时顺带跑一次能力自检，供 UI 持续展示
+        if adapter.connected and hasattr(adapter, "self_check"):
+            try:
+                out["self_check"] = adapter.self_check()
+            except Exception:
+                out["self_check"] = None
+        return out
 
     snap = await run_in_threadpool(_snapshot)
     return {
@@ -428,6 +454,41 @@ async def get_adapter_status(ai_id: str):
         "connected": adapter.connected,
         "alive": snap["alive"],
         "status": snap["status"],
+        "self_check": snap.get("self_check"),
+    }
+
+
+@router.get("/adapters/{ai_id}/selfcheck")
+async def selfcheck_adapter(ai_id: str):
+    """对指定 AI 适配器触发一次能力自检（连接成功后也可手动复检）。
+
+    仅对实现了 ``self_check`` 的适配器（当前为 Trae Work）生效；未连接或
+    不支持时返回 ``ok=False`` 并说明原因。
+    """
+    registry = get_adapter_registry()
+    adapter = registry.get(ai_id)
+    if not adapter:
+        raise HTTPException(status_code=404, detail=f"AI 适配器 {ai_id} 未注册")
+
+    if not hasattr(adapter, "self_check"):
+        return {
+            "ai_id": ai_id,
+            "ai_name": adapter.AI_NAME,
+            "ok": False,
+            "detail": f"{adapter.AI_NAME} 不支持能力自检",
+        }
+
+    def _run() -> dict:
+        return adapter.self_check() or {
+            "ok": False, "detail": "适配器未连接，无法自检",
+        }
+
+    sc = await run_in_threadpool(_run)
+    return {
+        "ai_id": ai_id,
+        "ai_name": adapter.AI_NAME,
+        "connected": adapter.connected,
+        **(sc if isinstance(sc, dict) else {"ok": False, "detail": "自检返回非预期结构"}),
     }
 
 

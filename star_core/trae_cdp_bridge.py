@@ -387,6 +387,65 @@ class TraeCDPBridge:
         return self._cdp.evaluate(target, _PROBE_GLOBALS_JS)
 
     # ------------------------------------------------------------------
+    # 能力自检（连接成功后自动触发）
+    # ------------------------------------------------------------------
+
+    def self_check(self) -> dict:
+        """连接成功后的能力自检：确认端口是真实 CDP、浏览器版本、target 数、
+        聊天 target 是否命中，以及渲染器是否可被 Star 脚本化驱动。
+
+        Returns:
+            结构化结果 dict，含 ``ok`` / ``browser`` / ``protocol`` /
+            ``target_count`` / ``chat_target_found`` / ``scriptable`` 等字段。
+            即使失败也返回完整 dict（``ok=False``），便于 UI 直接展示排障信息。
+        """
+        result: dict = {
+            "ok": False,
+            "port": self.port,
+            "cdp_reachable": False,
+            "browser": None,
+            "protocol": None,
+            "web_socket_debugger_url": None,
+            "target_count": 0,
+            "chat_target_found": False,
+            "chat_target_title": None,
+            "scriptable": False,
+            "scriptable_probe": None,
+            "detail": "",
+        }
+        ver = self._cdp.version()
+        if not ver:
+            result["detail"] = "CDP /json/version 无响应：端口可能未绑定或绑在死监听上"
+            return result
+        result["cdp_reachable"] = True
+        result["browser"] = ver.get("Browser")
+        result["protocol"] = ver.get("Protocol-Version")
+        result["web_socket_debugger_url"] = ver.get("webSocketDebuggerUrl")
+
+        tabs = self._cdp.list_tabs()
+        result["target_count"] = len(tabs)
+
+        target = self.find_chat_target()
+        if not target:
+            result["detail"] = "CDP 可达但未找到聊天 target（Trae 窗口可能尚未渲染完成）"
+            return result
+        result["chat_target_found"] = True
+        result["chat_target_title"] = target.get("title")
+
+        # 验证可脚本化：在聊天 target 上做一次最简单、无副作用的 Runtime.evaluate。
+        # 返回 2 即代表 CDP 命令链路与渲染器 JS 执行都正常，Star 可下发指令。
+        probe = self._cdp.evaluate(target, "1+1")
+        result["scriptable_probe"] = probe
+        result["scriptable"] = (probe == 2)
+        if not result["scriptable"]:
+            result["detail"] = "聊天 target 命中但 Runtime.evaluate 未返回预期值，脚本化链路异常"
+            return result
+
+        result["ok"] = True
+        result["detail"] = "CDP 真实可用，Trae 渲染器可被 Star 脚本化驱动"
+        return result
+
+    # ------------------------------------------------------------------
     # 核心操作
     # ------------------------------------------------------------------
 
